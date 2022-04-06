@@ -33,4 +33,4 @@ if __name__ == "__main__":
     # Get the command-line arguments
     args = cmdline()
     p = s4pipe.S4pipe(**args.__dict__)
-    s4pipe.load_healpix_sim(args.files[0])
+    p.project_sims()
