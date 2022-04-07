@@ -22,6 +22,10 @@ def cmdline():
     parser.add_argument("--log_format_date", action="store", type=str, default=default_log_format_date,
                         help="Format for date section of logging")
     args = parser.parse_args()
+
+    # The total number of files
+    args.nfiles = len(args.files)
+
     return args
 
 
