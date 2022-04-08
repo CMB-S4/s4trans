@@ -3,6 +3,11 @@ import time
 import logging
 from logging.handlers import RotatingFileHandler
 import sys
+import os
+import errno
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 def create_logger(logfile=None, level=logging.NOTSET, log_format=None, log_format_date=None):
@@ -55,6 +60,17 @@ def configure_logger(logger, logfile=None, level=logging.NOTSET, log_format=None
     handlers.append(sh)
     logger.addHandler(sh)
     return
+
+
+def create_dir(dirname):
+    "Safely attempt to create a folder"
+    if not os.path.isdir(dirname):
+        LOGGER.info(f"Creating directory {dirname}")
+        try:
+            os.makedirs(dirname, mode=0o755, exist_ok=True)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                LOGGER.warning(f"Problem creating {dirname} -- proceeding with trepidation")
 
 
 def elapsed_time(t1, verb=False):

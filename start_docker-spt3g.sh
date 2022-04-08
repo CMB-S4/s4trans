@@ -11,7 +11,7 @@ docker run -ti \
        $DOCKER_IMA bash
 
 # To re-enter from
-# NAME=headerservice; docker exec -ti $NAME bash
+# NAME=cmbs4; docker exec -ti $NAME bash
 
 # To clean up
 # docker rm $(docker ps -a -f status=exited -q)

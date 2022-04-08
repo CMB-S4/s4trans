@@ -3,13 +3,22 @@
 from s4trans import s4pipe
 import argparse
 import time
+import os
 
 
 def cmdline():
 
-    parser = argparse.ArgumentParser(description="CMBS4 transient tests pipeline")
+    parser = argparse.ArgumentParser(description="CMBS4 transient testing pipeline")
     parser.add_argument("files", nargs='+',
                         help="Filename(s) to preocess")
+    parser.add_argument("--outdir", type=str, action='store', default=None,
+                        required=True, help="Location for output files")
+
+    # Write options
+    parser.add_argument("--indirect_write", action='store_true', default=False,
+                        help="Use indirect write of files to /tmp before moving to destionation.")
+    parser.add_argument("--indirect_write_path", action='store', default=None,
+                        help="Path for indirect write.")
 
     # Logging options (loglevel/log_format/log_format_date)
     default_log_format = '[%(asctime)s.%(msecs)03d][%(levelname)s][%(name)s][%(funcName)s] %(message)s'
@@ -22,6 +31,17 @@ def cmdline():
     parser.add_argument("--log_format_date", action="store", type=str, default=default_log_format_date,
                         help="Format for date section of logging")
     args = parser.parse_args()
+
+    # Check environmental variables for indirect_write
+    if args.indirect_write_path is None and args.indirect_write is True:
+        if 'S4_CUTTER_INDIRECT_WRITE_PATH' in os.environ:
+            args.indirect_write_path = os.environ['S4_CUTTER_INDIRECT_WRITE_PATH']
+        else:
+            args.indirect_write_path = '/tmp'
+
+    # Define the prefix
+    if args.indirect_write:
+        args.indirect_write_prefix = os.path.join(args.indirect_write_path, 's4pipe-')
 
     # The total number of files
     args.nfiles = len(args.files)
