@@ -112,7 +112,7 @@ class S4pipe:
                 self.logger.info(f"Transforming Healpix to G3 frame for projection: {proj_name}")
                 frame3g = maps.healpix_to_flatsky(self.hp_array, **proj)
                 on_fraction = frame3g.npix_nonzero/frame3g.size
-                file_fraction.write(file, proj_name, on_fraction)
+                file_fraction.write(f"{file} {proj_name} {on_fraction}")
                 k += 1
 
             self.logger.info(f"Done with {file} time: {s4tools.elapsed_time(t1)} ")
