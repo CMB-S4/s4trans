@@ -26,16 +26,6 @@ class S4pipe:
         self.config = types.SimpleNamespace(**keys)
 
         self.setup_logging()
-
-        # Make sure that the folder exists: n
-        s4tools.create_dir(self.config.outdir)
-
-        if self.config.indirect_write:
-            self.tmpdir = mkdtemp(prefix=self.config.indirect_write_prefix)
-            self.logger.info(f"Preparing folder for indirect_write: {self.tmpdir}")
-            # Make sure that the folder exists:
-            s4tools.create_dir(self.tmpdir)
-
         self.proj = define_tiles_projection()
         return
 
@@ -104,9 +94,45 @@ class S4pipe:
             self.logger.info(f"Moving {self.outname_tmp} --> {self.outname}")
             shutil.move(self.outname_tmp, self.outname)
 
+    def find_onfraction(self):
+        """Find the fraction of non zero pixels in projection"""
+
+        file_fraction = open("on_fraction.txt", 'w')
+
+        t0 = time.time()
+        nfile = 1
+        for file in self.config.files:
+            self.logger.info(f"Doing: {nfile}/{self.config.nfiles} files")
+            # Load up the gzip healpix map
+            t1 = time.time()
+            self.load_healpix_map(file)
+            k = 1
+            for proj in self.proj:
+                proj_name = f"proj{k}"
+                self.logger.info(f"Transforming Healpix to G3 frame for projection: {proj_name}")
+                frame3g = maps.healpix_to_flatsky(self.hp_array, **proj)
+                on_fraction = frame3g.npix_nonzero/frame3g.size
+                file_fraction.write(file, proj_name, on_fraction)
+                k += 1
+
+            self.logger.info(f"Done with {file} time: {s4tools.elapsed_time(t1)} ")
+        nfile += 1
+        file_fraction.close()
+        self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
+
     def project_sims(self, filetypes=['FITS', 'G3']):
 
         t0 = time.time()
+
+        # Make sure that the folder exists: n
+        s4tools.create_dir(self.config.outdir)
+
+        if self.config.indirect_write:
+            self.tmpdir = mkdtemp(prefix=self.config.indirect_write_prefix)
+            self.logger.info(f"Preparing folder for indirect_write: {self.tmpdir}")
+            # Make sure that the folder exists:
+            s4tools.create_dir(self.tmpdir)
+
         nfile = 1
         for file in self.config.files:
 
