@@ -1,6 +1,6 @@
 
-TAGNAME=ubuntu_0.3.3_4efaaf2f
-DOCKER_IMA=menanteau/spt3g_ingest:$TAGNAME
+TAGNAME=0.1.0
+DOCKER_IMA=menanteau/s4trans:$TAGNAME
 NAME=cmbs4
 hostname="`hostname -s`-$NAME"
 

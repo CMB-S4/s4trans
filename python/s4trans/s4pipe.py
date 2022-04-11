@@ -60,6 +60,7 @@ class S4pipe:
                               log_format_date=self.config.log_format_date)
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"Logging Started at level:{self.config.loglevel}")
+        self.logger.info(f"Running spt3g_ingest version: {s4trans.__version__}")
 
     def load_healpix_map(self, filename, frame='T'):
         """Load a healpix map as an array"""
