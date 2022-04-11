@@ -1,5 +1,6 @@
 from spt3g import core, maps
 from s4trans import s4tools
+import s4trans
 import logging
 import types
 import time
