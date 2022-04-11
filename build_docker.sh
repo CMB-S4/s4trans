@@ -9,6 +9,7 @@ docker build -f docker/Dockerfile \
        -t menanteau/$IMAGE:$TAG \
        --build-arg S4TRANS_VERSION \
        --build-arg S4USER \
+       --no-cache \
        --rm=true .
 
 echo 'Push commands:'
