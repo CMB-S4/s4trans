@@ -163,7 +163,7 @@ class S4pipe:
                 k += 1
 
             self.logger.info(f"Done with {file} time: {s4tools.elapsed_time(t1)} ")
-        nfile += 1
+            nfile += 1
         ofile.close()
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
