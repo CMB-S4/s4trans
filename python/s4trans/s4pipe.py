@@ -7,12 +7,14 @@ import math
 import os
 from tempfile import mkdtemp
 import shutil
+import magic
 
 LOGGER = logging.getLogger(__name__)
 
 # Naming template
 INDR_OUTNAME = "{tmpdir}/{fileID}_{proj}.{ext}"
 FULL_OUTNAME = "{outdir}/{fileID}_{proj}.{ext}"
+FRAC_OUTNAME = "{outdir}/{fileID}.{ext}"
 BASE_OUTNAME = "{fileID}"
 BASEDIR_OUTNAME = "{outdir}/{fileID}"
 FILETYPE_EXT = {'FITS': 'fits', 'G3': 'g3.gz'}
@@ -25,9 +27,30 @@ class S4pipe:
     def __init__(self, **keys):
         self.config = types.SimpleNamespace(**keys)
 
+        # Start logging
         self.setup_logging()
+
+        # Check input files vs file list
+        self.check_input_files()
+
+        # Define the projections
         self.proj = define_tiles_projection()
         return
+
+    def check_input_files(self):
+        " Check if the inputs are a list or a file with a list"
+
+        t = magic.Magic(mime=True)
+        if self.config.nfiles == 1 and t.from_file(self.config.files[0]) == 'text/plain':
+            self.logger.info(f"{self.config.files[0]} is a list of files")
+            # Now read them in
+            with open(self.config.files[0], 'r') as f:
+                lines = f.read().splitlines()
+            self.logger.info(f"Read: {len(lines)} input files")
+            self.config.files = lines
+            self.config.nfiles = len(lines)
+        else:
+            self.logger.info("Nothing to see here")
 
     def setup_logging(self):
         """ Simple logger that uses configure_logger() """
@@ -75,6 +98,7 @@ class S4pipe:
         fileID = basename.split('.')[0]
         ext = FILETYPE_EXT[filetype]
         outdir = self.config.outdir
+        self.fileID = fileID
         if self.config.indirect_write:
             tmpdir = self.tmpdir
 
@@ -88,6 +112,17 @@ class S4pipe:
         else:
             self.outname_tmp = self.outname
 
+    def set_outname_frac(self, filename, ext='log'):
+        """ Define the name of the projected output files"""
+        basename = os.path.basename(filename)
+        fileID = basename.split('.')[0]
+        outdir = self.config.outdir
+        self.fileID = fileID
+
+        kw = locals()
+        self.outname_frac = FRAC_OUTNAME.format(**kw)
+        self.logger.info(f"Will write fractions to: {self.outname_frac}")
+
     def move_outname(self):
         """Move to original name in case that we use indirect_write"""
         if self.config.indirect_write:
@@ -97,27 +132,37 @@ class S4pipe:
     def find_onfraction(self):
         """Find the fraction of non zero pixels in projection"""
 
-        file_fraction = open("on_fraction.txt", 'w')
-
         t0 = time.time()
+        # Make sure that the folder exists: n
+        s4tools.create_dir(self.config.outdir)
+
         nfile = 1
         for file in self.config.files:
+
             self.logger.info(f"Doing: {nfile}/{self.config.nfiles} files")
             # Load up the gzip healpix map
             t1 = time.time()
             self.load_healpix_map(file)
+            # Get the name of the output file to record the fractions
+            self.set_outname_frac(file)
+            ofile = open(self.outname_frac, 'w')
+
             k = 1
             for proj in self.proj:
                 proj_name = f"proj{k}"
                 self.logger.info(f"Transforming Healpix to G3 frame for projection: {proj_name}")
+                t2 = time.time()
                 frame3g = maps.healpix_to_flatsky(self.hp_array, **proj)
+                self.logger.info(f"Done healpix_to_flatsky: {s4tools.elapsed_time(t2)} ")
                 on_fraction = frame3g.npix_nonzero/frame3g.size
-                file_fraction.write(f"{file} {proj_name} {on_fraction}")
+                sfraction = f"{self.fileID} {proj_name} {on_fraction:.6}"
+                self.logger.info(f"FRACTION: {sfraction}")
+                ofile.write(sfraction + "\n")
                 k += 1
 
             self.logger.info(f"Done with {file} time: {s4tools.elapsed_time(t1)} ")
         nfile += 1
-        file_fraction.close()
+        ofile.close()
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
     def project_sims(self, filetypes=['FITS', 'G3']):
