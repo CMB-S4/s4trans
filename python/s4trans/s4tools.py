@@ -5,9 +5,25 @@ from logging.handlers import RotatingFileHandler
 import sys
 import os
 import errno
+import sqlite3
+from s4trans.data_types import Fd
 
 
 LOGGER = logging.getLogger(__name__)
+
+# SQL string definitions
+# Create SQL statement to create table automatically
+_table_statement = ''
+for k in Fd.keys():
+    _table_statement += '{} {},\n'.format(k, Fd[k])
+# remove last comma
+_table_statement += 'UNIQUE(ID) '
+_table_statement = _table_statement.rstrip(',\n')
+
+# Template to insert a row
+_insert_row = """
+INSERT{or_replace}INTO {tablename} values ({values})
+"""
 
 
 def create_logger(logfile=None, level=logging.NOTSET, log_format=None, log_format_date=None):
@@ -92,3 +108,100 @@ def elapsed_time(t1, verb=False):
     if verb:
         print("Elapsed time: {}".format(stime))
     return stime
+
+
+def connect_db(dbname, tablename):
+    """Establisih connection to DB"""
+
+    LOGGER.info(f"Establishing DB connection to: {dbname}")
+
+    # Connect to DB
+    # SQLlite DB lives in a file
+    con = sqlite3.connect(dbname)
+
+    # Create the table
+    create_table = """
+    CREATE TABLE IF NOT EXISTS {tablename} (
+    {statement}
+    )
+    """.format(**{'tablename': tablename, 'statement': _table_statement})
+    LOGGER.debug(create_table)
+
+    cur = con.cursor()
+    cur.execute(create_table)
+    con.commit()
+    return con
+
+
+def check_dbtable(dbname, tablename):
+    """ Check tablename exists in database"""
+    LOGGER.info(f"Checking {tablename} exits in: {dbname}")
+    # Connect to DB
+    con = sqlite3.connect(dbname)
+    # Create the table
+    create_table = """
+    CREATE TABLE IF NOT EXISTS {tablename} (
+    {statement}
+    )
+    """.format(**{'tablename': tablename, 'statement': _table_statement})
+    LOGGER.debug(create_table)
+
+    cur = con.cursor()
+    cur.execute(create_table)
+    con.commit()
+    con.close()
+    return
+
+
+def ingest_fraction_file(filename, tablename, con=None, dbname=None, replace=False):
+
+    # Make new connection if not available
+    if not con:
+        close_con = True
+        con = sqlite3.connect(dbname)
+    else:
+        close_con = False
+
+    # Get cursor
+    cur = con.cursor()
+
+    if replace:
+        or_replace = ' OR REPLACE '
+    else:
+        or_replace = ' '
+
+    # Read in the file
+    LOGGER.info(f"Ingesting: {filename} to: {tablename}")
+    with open(filename) as file:
+        for line in file:
+            SIMID, PROJ, FRACTION = line.rstrip().split()
+            ID = f"{SIMID}_{PROJ}"
+
+            # Create the ingested values in the same order,
+            # starting for those 3 keys by hand
+            values = []
+            values.append(ID)
+            values.append(SIMID)
+            values.append(PROJ)
+            values.append(FRACTION)
+
+            # Convert the values into a long string
+            vvv = ''
+            for v in values:
+                vvv += '\"' + v + '\", '
+            vvv = vvv.rstrip(', ')
+
+            query = _insert_row.format(**{'or_replace': or_replace,
+                                          'tablename': tablename, 'values': vvv})
+            LOGGER.debug(f"Executing:{query}")
+            try:
+                cur.execute(query)
+                con.commit()
+                LOGGER.info(f"Ingestion Done for: {ID}")
+            except sqlite3.IntegrityError:
+                LOGGER.warning(f"NOT UNIQUE: ingestion failed for {ID}")
+
+    # Done close connection
+    if close_con:
+        con.close()
+    return

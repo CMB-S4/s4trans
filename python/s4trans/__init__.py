@@ -4,3 +4,4 @@ version = __version__
 
 from . import s4pipe
 from . import s4tools
+from . import data_types

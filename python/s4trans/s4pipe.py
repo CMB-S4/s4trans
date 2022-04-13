@@ -31,9 +31,6 @@ class S4pipe:
         # Start logging
         self.setup_logging()
 
-        # Check input files vs file list
-        self.check_input_files()
-
         # Define the projections
         self.proj = define_tiles_projection()
         return
@@ -135,6 +132,9 @@ class S4pipe:
         """Find the fraction of non zero pixels in projection"""
 
         t0 = time.time()
+
+        # Check input files vs file list
+        self.check_input_files()
         # Make sure that the folder exists: n
         s4tools.create_dir(self.config.outdir)
 
@@ -170,6 +170,8 @@ class S4pipe:
     def project_sims(self, filetypes=['FITS', 'G3']):
 
         t0 = time.time()
+        # Check input files vs file list
+        self.check_input_files()
 
         # Make sure that the folder exists: n
         s4tools.create_dir(self.config.outdir)
@@ -212,6 +214,14 @@ class S4pipe:
             self.logger.info(f"Done with {file} time: {s4tools.elapsed_time(t1)} ")
         nfile += 1
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
+
+    def ingest_onfraction(self):
+
+        # Make the connection to the DB
+        con = s4tools.connect_db(self.config.dbname, self.config.tablename)
+
+        for filename in self.config.files:
+            s4tools.ingest_fraction_file(filename, self.config.tablename, con=con)
 
 
 def define_tiles_projection(ntiles=6, x_len=14000, y_len=20000,
