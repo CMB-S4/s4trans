@@ -216,12 +216,21 @@ class S4pipe:
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
     def ingest_onfraction(self):
+        """Ingest the on fraction log files into the sqlite3 database"""
 
+        t0 = time.time()
         # Make the connection to the DB
         con = s4tools.connect_db(self.config.dbname, self.config.tablename)
 
+        # Loop over all of the files
+        nfile = 1
         for filename in self.config.files:
+            t1 = time.time()
+            self.logger.info(f"Doing: {nfile}/{self.config.nfiles} files")
             s4tools.ingest_fraction_file(filename, self.config.tablename, con=con)
+            self.logger.info(f"Done with {filename} time: {s4tools.elapsed_time(t1)} ")
+            nfile += 1
+        self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
 
 def define_tiles_projection(ntiles=6, x_len=14000, y_len=20000,

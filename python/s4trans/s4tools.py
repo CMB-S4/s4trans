@@ -154,6 +154,7 @@ def check_dbtable(dbname, tablename):
 
 
 def ingest_fraction_file(filename, tablename, con=None, dbname=None, replace=False):
+    """Ingest fractions from files into sqlite3 database"""
 
     # Make new connection if not available
     if not con:
@@ -165,6 +166,7 @@ def ingest_fraction_file(filename, tablename, con=None, dbname=None, replace=Fal
     # Get cursor
     cur = con.cursor()
 
+    # Replace or not
     if replace:
         or_replace = ' OR REPLACE '
     else:
@@ -178,26 +180,18 @@ def ingest_fraction_file(filename, tablename, con=None, dbname=None, replace=Fal
             ID = f"{SIMID}_{PROJ}"
 
             # Create the ingested values in the same order,
-            # starting for those 3 keys by hand
-            values = []
-            values.append(ID)
-            values.append(SIMID)
-            values.append(PROJ)
-            values.append(FRACTION)
-
+            values = [ID, SIMID, PROJ, FRACTION]
             # Convert the values into a long string
-            vvv = ''
-            for v in values:
-                vvv += '\"' + v + '\", '
-            vvv = vvv.rstrip(', ')
+            values_str = ", ".join(f'"{x}"' for x in values)
 
-            query = _insert_row.format(**{'or_replace': or_replace,
-                                          'tablename': tablename, 'values': vvv})
-            LOGGER.debug(f"Executing:{query}")
+            # Format the insert query
+            insert_query = _insert_row.format(**{'or_replace': or_replace,
+                                                 'tablename': tablename, 'values': values_str})
+            LOGGER.debug(f"Executing:{insert_query}")
             try:
-                cur.execute(query)
+                cur.execute(insert_query)
                 con.commit()
-                LOGGER.info(f"Ingestion Done for: {ID}")
+                LOGGER.info(f"Ingestion Done for ID: {ID}")
             except sqlite3.IntegrityError:
                 LOGGER.warning(f"NOT UNIQUE: ingestion failed for {ID}")
 
