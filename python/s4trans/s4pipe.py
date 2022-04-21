@@ -86,6 +86,7 @@ class S4pipe:
         t0 = time.time()
         f = core.G3Frame(core.G3FrameType.Map)
         f['T'] = frame3g
+        f['T'].sparse = False
         core.G3Writer(filename=self.outname_tmp)(f)
         # In case we have indirect_write
         self.move_outname()
