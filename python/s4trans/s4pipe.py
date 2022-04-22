@@ -168,6 +168,12 @@ class S4pipe:
         ofile.close()
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
+    def filter_sim(self, ):
+
+        """Filter Simulation using transient filtering method"""
+
+        return
+
     def project_sims(self, filetypes=['FITS', 'G3']):
 
         t0 = time.time()
