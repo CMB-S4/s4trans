@@ -6,7 +6,7 @@ RUN apt-get update --fix-missing
 
 # Git clone and version checkout and install of spt3g_ingest
 ARG S4TRANS_VERSION
-RUN git clone https://github.com/CMB-NCSA/s4trans -b $S4TRANS_VERSION && \
+RUN git clone https://github.com/CMB-S4/s4trans -b $S4TRANS_VERSION && \
     cd s4trans && \
     python setup.py install && \
     cd .. && \
