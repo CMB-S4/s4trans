@@ -3,6 +3,7 @@
 from s4trans import s4pipe
 import argparse
 import time
+import os
 
 
 def cmdline():
@@ -41,6 +42,17 @@ def cmdline():
     parser.add_argument("--log_format_date", action="store", type=str, default=default_log_format_date,
                         help="Format for date section of logging")
     args = parser.parse_args()
+
+    # Check environmental variables for indirect_write
+    if args.indirect_write_path is None and args.indirect_write is True:
+        if 'S4_CUTTER_INDIRECT_WRITE_PATH' in os.environ:
+            args.indirect_write_path = os.environ['S4_CUTTER_INDIRECT_WRITE_PATH']
+        else:
+            args.indirect_write_path = '/tmp'
+
+    # Define the prefix
+    if args.indirect_write:
+        args.indirect_write_prefix = os.path.join(args.indirect_write_path, 's4pipe-')
 
     #  The number of files
     args.nfiles = len(args.files)

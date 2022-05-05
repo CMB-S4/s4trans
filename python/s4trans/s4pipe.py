@@ -190,6 +190,7 @@ class S4pipe:
         # In case we have indirect_write
         self.move_outname()
         self.logger.info(f"Filtering file {file} done: {s4tools.elapsed_time(t0)} ")
+        self.logger.info(f"Created file: {self.outname}")
         return
 
     def filter_sims(self):
