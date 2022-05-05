@@ -151,8 +151,8 @@ class S4pipe:
             ofile = open(self.outname_frac, 'w')
 
             k = 1
-            for proj in self.proj:
-                proj_name = f"proj{k}"
+            for proj_name, proj in self.proj.items():
+
                 self.logger.info(f"Transforming Healpix to G3 frame for projection: {proj_name}")
                 t2 = time.time()
                 frame3g = maps.healpix_to_flatsky(self.hp_array, **proj)
@@ -168,9 +168,57 @@ class S4pipe:
         ofile.close()
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
-    def filter_sim(self, file):
+    def filter_sim_file(self, file, proj_name):
         """Filter Simulations using transient filtering method"""
+        t0 = time.time()
+        proj = self.proj[proj_name]
         self.load_healpix_map(file)
+        t1 = time.time()
+        self.logger.info(f"Transforming Healpix to G3 frame for projection {proj_name}")
+        frame3g = maps.healpix_to_flatsky(self.hp_array, **proj)
+        self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
+
+        # Get the outname
+        self.set_outname(file, f"flt_{proj_name}", filetype='G3')
+
+        pipe = core.G3Pipeline()
+        pipe.Add(core.G3InfiniteSource, n=0)
+        pipe.Add(maps.InjectMaps, map_id="", maps_in=[frame3g], ignore_missing_weights=True)
+        pipe.Add(core.G3Writer, filename=self.outname_tmp)
+        pipe.Run()
+
+        # In case we have indirect_write
+        self.move_outname()
+        self.logger.info(f"Filtering file {file} done: {s4tools.elapsed_time(t0)} ")
+        return
+
+    def filter_sims(self):
+        """Run function self.filter_sim_file for a set of files and filters"""
+        t0 = time.time()
+        # Check input files vs file list
+        self.check_input_files()
+
+        # Make sure that the folder exists: n
+        s4tools.create_dir(self.config.outdir)
+
+        if self.config.indirect_write:
+            self.tmpdir = mkdtemp(prefix=self.config.indirect_write_prefix)
+            self.logger.info(f"Preparing folder for indirect_write: {self.tmpdir}")
+            # Make sure that the folder exists:
+            s4tools.create_dir(self.tmpdir)
+
+        nfile = 1
+        for file in self.config.files:
+            self.logger.info(f"Doing: {nfile}/{self.config.nfiles} files")
+            for proj_name in self.config.proj_name:
+                on_fraction = self.get_db_onfraction(file, proj_name)
+                if on_fraction > self.config.onfracion_thresh:
+                    self.filter_sim_file(file, proj_name)
+                else:
+                    self.logger.info(f"Skipping file: {file}")
+
+            nfile += 1
+        self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
         return
 
     def project_sims(self, filetypes=['FITS', 'G3']):
@@ -238,6 +286,27 @@ class S4pipe:
             nfile += 1
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
+    def get_db_onfraction(self, filename, proj_name):
+        "Get the on fraction"
+        self.dbhandle = s4tools.connect_db(self.config.dbname)
+
+        # Clean up the name to get the SIMID
+        simID = os.path.basename(filename).split(".")[0]
+        query = f'select fraction from {self.config.tablename} where SIMID="{simID}" and PROJ="{proj_name}" '
+
+        # Get the cursor from the DB handle
+        cur = self.dbhandle.cursor()
+        # Execute
+        cur.execute(query)
+        try:
+            fraction = cur.fetchone()[0]
+            self.logger.info(f"Fraction: {fraction} for {filename}")
+        except TypeError:
+            fraction = None
+            self.logger.warning(f"on-fraction not found for {filename} and {proj_name}")
+        cur.close()
+        return fraction
+
 
 def define_tiles_projection(ntiles=6, x_len=14000, y_len=20000,
                             res=7.27220521664304e-05,
@@ -245,9 +314,10 @@ def define_tiles_projection(ntiles=6, x_len=14000, y_len=20000,
                             delta_center=-0.401834135):  # -23.024 in radians
 
     LOGGER.info(f"Will define {ntiles} tiles")
-    proj = []
+    proj = {}
     dx = int(360./ntiles)
     for i in range(ntiles):
+        proj_name = f"proj{i+1}"
         LOGGER.info(f"Defining alpha_center for tile {i+1}  at {i*dx} degrees")
         alpha_center = i*dx*math.pi/180.
         p = {'res': res,
@@ -257,5 +327,5 @@ def define_tiles_projection(ntiles=6, x_len=14000, y_len=20000,
              'alpha_center': alpha_center,
              'delta_center': delta_center,
              'proj': maps.MapProjection.ProjZEA}
-        proj.append(p)
+        proj[proj_name] = p
     return proj

@@ -8,12 +8,12 @@ bin_files = glob.glob("bin/*")
 etc_dirs = ['etc']
 data_files = [("", ["setpath.sh"])]
 # In case we want files in etc
-# for edir in etc_dirs:
-#    data_files.append((edir, glob.glob("{}/*".format(edir))))
+for edir in etc_dirs:
+    data_files.append((edir, glob.glob("{}/*".format(edir))))
 
 # The main call
 setup(name='s4trans',
-      version='0.1.0',
+      version='0.1.1',
       license="GPL",
       description="CMBS4 test transient pipeline",
       author="Felipe Menanteau",

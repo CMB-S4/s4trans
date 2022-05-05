@@ -110,7 +110,7 @@ def elapsed_time(t1, verb=False):
     return stime
 
 
-def connect_db(dbname, tablename):
+def connect_db(dbname, tablename=None):
     """Establisih connection to DB"""
 
     LOGGER.info(f"Establishing DB connection to: {dbname}")
@@ -119,7 +119,10 @@ def connect_db(dbname, tablename):
     # SQLlite DB lives in a file
     con = sqlite3.connect(dbname)
 
-    # Create the table
+    if tablename is None:
+        return con
+
+    # Create tablename if passed along
     create_table = """
     CREATE TABLE IF NOT EXISTS {tablename} (
     {statement}
