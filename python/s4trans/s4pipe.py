@@ -1,4 +1,4 @@
-from spt3g import core, maps
+from spt3g import core, maps, transients
 from s4trans import s4tools
 import s4trans
 import logging
@@ -9,6 +9,8 @@ import os
 from tempfile import mkdtemp
 import shutil
 import magic
+import numpy
+import datetime
 
 LOGGER = logging.getLogger(__name__)
 
@@ -168,22 +170,47 @@ class S4pipe:
         ofile.close()
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
-    def filter_sim_file(self, file, proj_name):
+    def filter_sim_file(self, file, proj_name, band='150GHz'):
         """Filter Simulations using transient filtering method"""
         t0 = time.time()
         proj = self.proj[proj_name]
         self.load_healpix_map(file)
         t1 = time.time()
         self.logger.info(f"Transforming Healpix to G3 frame for projection {proj_name}")
-        frame3g = maps.healpix_to_flatsky(self.hp_array, **proj)
+        map3g = maps.healpix_to_flatsky(self.hp_array, **proj)
         self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
 
         # Get the outname
         self.set_outname(file, f"flt_{proj_name}", filetype='G3')
 
+        # Get the obs_id based on the name of the file
+        date0 = datetime.datetime(2013, 1, 1, 0, 0).timestamp()
+        s = ''.join(file.split('_')[3].split('-'))
+        obs_id = date0 + int.from_bytes(s.encode(), 'little')/1e5
+
+        #frame3g['Id'] = band
+        #frame3g['ObservationID'] = obs_id
+
+        #frames = [frame3g]
+        #pipe.Add(lambda fr: frames.pop())
+
+
+        # Create a weights maps of ones
+        weights = map3g.clone()
+        numpy.asarray(weights)[:] = 1
+        weightmap = maps.G3SkyMapWeights()
+        weightmap.TT = weights
+
         pipe = core.G3Pipeline()
         pipe.Add(core.G3InfiniteSource, n=0)
-        pipe.Add(maps.InjectMaps, map_id="", maps_in=[frame3g], ignore_missing_weights=True)
+        pipe.Add(maps.InjectMaps, map_id=band, maps_in=[map3g, weightmap])
+        def addid(fr, obs_id):
+            fr['ObservationID'] = obs_id
+        pipe.Add(addid, obs_id=obs_id)
+        pipe.Add(maps.map_modules.MakeMapsUnpolarized)
+        pipe.Add(transients.TransientMapFiltering,
+                 bands=[band],  # or just band
+                 subtract_coadd=False)
         pipe.Add(core.G3Writer, filename=self.outname_tmp)
         pipe.Run()
 
