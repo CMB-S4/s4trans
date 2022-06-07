@@ -336,10 +336,53 @@ class S4pipe:
         return fraction
 
 
-def define_tiles_projection(ntiles=6, x_len=14000, y_len=20000,
-                            res=7.27220521664304e-05,
-                            weighted=False,
-                            delta_center=-0.401834135):  # -23.024 in radians
+def define_tiles_projection(x_len=5000, y_len=5000,
+                            delta_up=0, delta_low=-50,
+                            res=7.27220521664304e-05,  # arcmin?
+                            weighted=False):
+
+    d2r = math.pi/180.  # degrees to radians shorthand
+    delta_width = round(res*60*y_len, -1)
+    LOGGER.info(f"Will define tiles with delta_width: {delta_width} degrees")
+
+    ntiles = 0
+    delta_done = False
+    proj = {}
+    j = 0
+    delta_center = delta_up - delta_width/2.0
+    while delta_done is False:
+        i = 0
+        alpha_width = delta_width/math.cos(delta_center*d2r)
+        alpha_center = alpha_width/2.0
+        while alpha_center < 360:
+            proj_name = f"proj_{j:02d}-{i:02d}"
+            msg = f"Defining (alpha, delta) center for {proj_name} at {alpha_center:.1f},{delta_center} deg"
+            LOGGER.info(msg)
+            p = {'res': res,
+                 'x_len': x_len,
+                 'y_len': y_len,
+                 'weighted': weighted,
+                 'alpha_center': alpha_center,
+                 'delta_center': delta_center*d2r,
+                 'proj': maps.MapProjection.ProjZEA}
+            proj[proj_name] = p
+            print(p)
+            alpha_center = i*alpha_width + alpha_width/2.0
+            ntiles = ntiles + 1
+            i = i + 1
+
+        j = j + 1
+        delta_center = delta_up - j*delta_width - delta_width/2.0
+        if delta_center <= delta_low:
+            delta_done = True
+    LOGGER.info(f"Defined {ntiles} tiles")
+    return proj
+
+
+def define_tiles_projection_old(ntiles=6, x_len=14000, y_len=20000,
+                                res=7.27220521664304e-05,
+                                weighted=False,
+                                delta_center=-0.401834135):  # -23.024 in radians
 
     LOGGER.info(f"Will define {ntiles} tiles")
     proj = {}
