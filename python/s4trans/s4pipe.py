@@ -245,7 +245,7 @@ class S4pipe:
             self.logger.info(f"Doing: {nfile}/{self.config.nfiles} files")
             for proj_name in self.config.proj_name:
                 on_fraction = self.get_db_onfraction(file, proj_name)
-                if on_fraction > self.config.onfracion_thresh:
+                if on_fraction > self.config.onfracion_thresh and on_fraction is not None:
                     self.filter_sim_file(file, proj_name)
                 else:
                     self.logger.info(f"Skipping proj:{proj_name} for file: {file}")
