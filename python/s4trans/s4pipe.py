@@ -35,6 +35,11 @@ class S4pipe:
 
         # Define the projections
         self.proj = define_tiles_projection()
+        self.proj_names = self.proj.keys()
+
+        # Init the dbhandle
+        self.dbhandle = None
+
         return
 
     def check_input_files(self):
@@ -188,24 +193,20 @@ class S4pipe:
         s = ''.join(file.split('_')[3].split('-'))
         obs_id = date0 + int.from_bytes(s.encode(), 'little')/1e5
 
-        #frame3g['Id'] = band
-        #frame3g['ObservationID'] = obs_id
-
-        #frames = [frame3g]
-        #pipe.Add(lambda fr: frames.pop())
-
-
         # Create a weights maps of ones
         weights = map3g.clone()
-        numpy.asarray(weights)[:] = 1
+        idx = numpy.where(weights != 0)
+        numpy.asarray(weights)[idx] = 1
         weightmap = maps.G3SkyMapWeights()
         weightmap.TT = weights
 
         pipe = core.G3Pipeline()
         pipe.Add(core.G3InfiniteSource, n=0)
         pipe.Add(maps.InjectMaps, map_id=band, maps_in=[map3g, weightmap])
+
         def addid(fr, obs_id):
             fr['ObservationID'] = obs_id
+
         pipe.Add(addid, obs_id=obs_id)
         pipe.Add(maps.map_modules.MakeMapsUnpolarized)
         pipe.Add(transients.TransientMapFiltering,
@@ -229,6 +230,10 @@ class S4pipe:
         # Make sure that the folder exists: n
         s4tools.create_dir(self.config.outdir)
 
+        if self.config.proj_name[0] == 'all':
+            self.config.proj_name = self.proj_names
+            self.logger.info("Will use all proj_names")
+
         if self.config.indirect_write:
             self.tmpdir = mkdtemp(prefix=self.config.indirect_write_prefix)
             self.logger.info(f"Preparing folder for indirect_write: {self.tmpdir}")
@@ -243,7 +248,7 @@ class S4pipe:
                 if on_fraction > self.config.onfracion_thresh:
                     self.filter_sim_file(file, proj_name)
                 else:
-                    self.logger.info(f"Skipping file: {file}")
+                    self.logger.info(f"Skipping proj:{proj_name} for file: {file}")
 
             nfile += 1
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
@@ -315,8 +320,10 @@ class S4pipe:
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
     def get_db_onfraction(self, filename, proj_name):
+
         "Get the on fraction"
-        self.dbhandle = s4tools.connect_db(self.config.dbname)
+        if self.dbhandle is None:
+            self.dbhandle = s4tools.connect_db(self.config.dbname)
 
         # Clean up the name to get the SIMID
         simID = os.path.basename(filename).split(".")[0]
@@ -366,7 +373,6 @@ def define_tiles_projection(x_len=5000, y_len=5000,
                  'delta_center': delta_center*d2r,
                  'proj': maps.MapProjection.ProjZEA}
             proj[proj_name] = p
-            print(p)
             alpha_center = i*alpha_width + alpha_width/2.0
             ntiles = ntiles + 1
             i = i + 1
@@ -400,3 +406,9 @@ def define_tiles_projection_old(ntiles=6, x_len=14000, y_len=20000,
              'proj': maps.MapProjection.ProjZEA}
         proj[proj_name] = p
     return proj
+
+
+        #frame3g['Id'] = band
+        #frame3g['ObservationID'] = obs_id
+        #frames = [frame3g]
+        #pipe.Add(lambda fr: frames.pop())
