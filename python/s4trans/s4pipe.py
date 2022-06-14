@@ -190,8 +190,10 @@ class S4pipe:
 
         # Get the obs_id based on the name of the file
         date0 = datetime.datetime(2013, 1, 1, 0, 0).timestamp()
-        s = ''.join(file.split('_')[3].split('-'))
-        obs_id = date0 + int.from_bytes(s.encode(), 'little')/1e5
+        f = os.path.basename(file)
+        s = ''.join(f.split('_')[3].split('-'))
+        obs_id = int(date0 + int.from_bytes(s.encode(), 'little')/1e5)
+        self.logger.info(f"Will add obs_id: {obs_id} to: {file}")
 
         # Create a weights maps of ones
         weights = map3g.clone()
@@ -204,10 +206,7 @@ class S4pipe:
         pipe.Add(core.G3InfiniteSource, n=0)
         pipe.Add(maps.InjectMaps, map_id=band, maps_in=[map3g, weightmap])
 
-        def addid(fr, obs_id):
-            fr['ObservationID'] = obs_id
-
-        pipe.Add(addid, obs_id=obs_id)
+        pipe.Add(addid_to_frame, obs_id=obs_id)
         pipe.Add(maps.map_modules.MakeMapsUnpolarized)
         pipe.Add(transients.TransientMapFiltering,
                  bands=[band],  # or just band
@@ -406,6 +405,11 @@ def define_tiles_projection_old(ntiles=6, x_len=14000, y_len=20000,
              'proj': maps.MapProjection.ProjZEA}
         proj[proj_name] = p
     return proj
+
+
+def addid_to_frame(fr, obs_id):
+    """ Add obs_id to a frame"""
+    fr['ObservationID'] = obs_id
 
 
         #frame3g['Id'] = band

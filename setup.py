@@ -13,7 +13,7 @@ for edir in etc_dirs:
 
 # The main call
 setup(name='s4trans',
-      version='0.1.5',
+      version='0.1.6',
       license="GPL",
       description="CMBS4 test transient pipeline",
       author="Felipe Menanteau",
