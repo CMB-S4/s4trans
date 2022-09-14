@@ -40,6 +40,9 @@ class S4pipe:
         # Init the dbhandle
         self.dbhandle = None
 
+        # Define the self.hp_array dict for later
+        self.hp_array = {}
+
         return
 
     def check_input_files(self):
@@ -70,11 +73,14 @@ class S4pipe:
     def load_healpix_map(self, filename, frame='T'):
         """Load a healpix map as an array"""
         t0 = time.time()
-        self.logger.info(f"Reading into array file: {filename}")
-        hp_array = maps.load_skymap_fits(filename)
-        LOGGER.info(f"Read time: {s4tools.elapsed_time(t0)}")
-        self.hp_array = hp_array[frame]
-        return self.hp_array
+        if filename in self.hp_array:
+            self.logger.info(f"Healpix map from: {filename} already stored -- skipping")
+        else:
+            self.logger.info(f"Reading into array file: {filename}")
+            hp_array = maps.load_skymap_fits(filename)
+            LOGGER.info(f"Read time: {s4tools.elapsed_time(t0)}")
+            self.hp_array[filename] = hp_array[frame]
+        return self.hp_array[filename]
 
     def write_fits(self, frame3g, file, proj_name):
         # Get self.outname and self.outname_tmp
@@ -162,7 +168,7 @@ class S4pipe:
 
                 self.logger.info(f"Transforming Healpix to G3 frame for projection: {proj_name}")
                 t2 = time.time()
-                frame3g = maps.healpix_to_flatsky(self.hp_array, **proj)
+                frame3g = maps.healpix_to_flatsky(self.hp_array[file], **proj)
                 self.logger.info(f"Done healpix_to_flatsky: {s4tools.elapsed_time(t2)} ")
                 on_fraction = frame3g.npix_nonzero/frame3g.size
                 sfraction = f"{self.fileID} {proj_name} {on_fraction:.6}"
@@ -175,6 +181,15 @@ class S4pipe:
         ofile.close()
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
+    def calculate_onfraction(self, file, proj_name):
+        """Compute on fraction for file and proj_name"""
+        self.logger.info(f"Transforming Healpix to G3 frame for projection: {proj_name}")
+        self.load_healpix_map(file)
+        proj = self.proj[proj_name]
+        frame3g = maps.healpix_to_flatsky(self.hp_array[file], **proj)
+        on_fraction = frame3g.npix_nonzero/frame3g.size
+        return on_fraction
+
     def filter_sim_file(self, file, proj_name, band='150GHz'):
         """Filter Simulations using transient filtering method"""
         t0 = time.time()
@@ -182,7 +197,7 @@ class S4pipe:
         self.load_healpix_map(file)
         t1 = time.time()
         self.logger.info(f"Transforming Healpix to G3 frame for projection {proj_name}")
-        map3g = maps.healpix_to_flatsky(self.hp_array, **proj)
+        map3g = maps.healpix_to_flatsky(self.hp_array[file], **proj)
         self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
 
         # Get the outname
@@ -262,6 +277,10 @@ class S4pipe:
         # Make sure that the folder exists: n
         s4tools.create_dir(self.config.outdir)
 
+        if self.config.proj_name[0] == 'all':
+            self.config.proj_name = self.proj_names
+            self.logger.info("Will use all proj_names")
+
         if self.config.indirect_write:
             self.tmpdir = mkdtemp(prefix=self.config.indirect_write_prefix)
             self.logger.info(f"Preparing folder for indirect_write: {self.tmpdir}")
@@ -270,36 +289,45 @@ class S4pipe:
 
         nfile = 1
         for file in self.config.files:
-
             self.logger.info(f"Doing: {nfile}/{self.config.nfiles} files")
 
-            # Load up the gzip healpix map
             t1 = time.time()
-            self.load_healpix_map(file)
+            for proj_name, proj in self.proj.items():
+                try:
+                    on_fraction = self.get_db_onfraction(file, proj_name)
+                except Exception:
+                    self.logger.warning(f"Cannot find fraction for {file} on DB")
+                    on_fraction = self.calculate_onfraction(file, proj_name)
 
-            k = 1
-            for proj in self.proj:
-                proj_name = f"proj{k}"
-
-                self.logger.info(f"Transforming Healpix to G3 frame for projection: {proj_name}")
-                frame3g = maps.healpix_to_flatsky(self.hp_array, **proj)
-                on_fraction = frame3g.npix_nonzero/frame3g.size
-
-                if on_fraction > 0.05:
+                # Project if above threshold
+                if on_fraction > self.config.onfracion_thresh and on_fraction is not None:
                     self.logger.info(f"Fraction of non-zero pixels above threshold: {on_fraction}")
-                    self.logger.info(f"New Frame:\n {frame3g}")
-                    if 'FITS' in filetypes:
-                        self.write_fits(frame3g, file, proj_name)
-                    if 'G3' in filetypes:
-                        self.write_g3(frame3g, file, proj_name)
+                    self.project_sim_file(file, proj_name, filetypes)
+
                 else:
                     self.logger.info(f"Fraction of non-zero pixels below threshold: {on_fraction}")
                     self.logger.info(f"Skipping FITS for projection: {proj_name}")
-                k += 1
 
             self.logger.info(f"Done with {file} time: {s4tools.elapsed_time(t1)} ")
         nfile += 1
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
+
+    def project_sim_file(self, file, proj_name, filetypes):
+        """ Project single sim file"""
+        t0 = time.time()
+        proj = self.proj[proj_name]
+        self.load_healpix_map(file)
+        t1 = time.time()
+        self.logger.info(f"Transforming Healpix to G3 frame for projection {proj_name}")
+        frame3g = maps.healpix_to_flatsky(self.hp_array[file], **proj)
+        self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
+        self.logger.info(f"New Frame:\n {frame3g}")
+        if 'FITS' in filetypes:
+            self.write_fits(frame3g, file, proj_name)
+        if 'G3' in filetypes:
+            self.write_g3(frame3g, file, proj_name)
+        self.logger.info(f"Projecting of file: {file} done: {s4tools.elapsed_time(t0)} ")
+        return
 
     def ingest_onfraction(self):
         """Ingest the on fraction log files into the sqlite3 database"""

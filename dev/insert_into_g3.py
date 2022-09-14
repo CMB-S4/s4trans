@@ -2,14 +2,15 @@
 
 from spt3g import core
 
-g3file = 'yearly_220GHz_winter_2020_tonly.g3.gz'
+g3file = 'filter_sims/mapmaker_RISING_SCAN_40-100-8_noiseweighted_map_nside4096_flt_proj_00-00.g3.gz'
 
 g3 = core.G3File(g3file)
 for frame in g3:
     print(f"frame:{frame}")
+    print(frame['T'])
     #print(frame['T'].__dict__)
 
-    print(dir(frame['T']))
+    # print(dir(frame['T']))
     #for att in dir(frame['T']):
     #    try:
     #        print(f"{att}: {getattr(frame['T'],att)}")

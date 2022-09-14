@@ -15,13 +15,14 @@ def cmdline():
                         required=True, help="Location for output files")
 
     # DB options
-    parser.add_argument("--dbname", type=str, action='store', default=None,
+    dbname = os.path.join(os.environ['HOME'], "db/s4sims.db")
+    parser.add_argument("--dbname", type=str, action='store', default=dbname,
                         help="Database (file) to connect")
     parser.add_argument("--tablename", type=str, action='store', default='on_fracton_v2',
                         help="Name of table with file informatiom")
 
     # Fraction threshold
-    parser.add_argument("--onfracion_thresh", action='store', default=0.5,
+    parser.add_argument("--onfracion_thresh", action='store', type=float, default=0.5,
                         help="On Fraction threshold")
     parser.add_argument("--proj_name", nargs='+', action='store', default=None, required=True,
                         help="Projection to use")

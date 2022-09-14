@@ -3,6 +3,7 @@
 from s4trans import s4pipe
 import argparse
 import time
+import os
 
 
 def cmdline():
@@ -10,10 +11,13 @@ def cmdline():
     parser = argparse.ArgumentParser(description="CMBS4 transient testing pipeline")
     parser.add_argument("files", nargs='+',
                         help="Filename(s) to preocess")
-    parser.add_argument("--dbname", type=str, action='store', default=None,
-                        required=True, help="Name of the database to use")
-    parser.add_argument("--tablename", action='store', default="on_fracton_v1",
-                        help="Table name with file infomation")
+
+    # DB options
+    dbname = os.path.join(os.environ['HOME'], "/db/s4sims.db")
+    parser.add_argument("--dbname", type=str, action='store', default=dbname,
+                        help="Database (file) to connect")
+    parser.add_argument("--tablename", type=str, action='store', default='on_fracton_v2',
+                        help="Name of table with file informatiom")
     # Logging options (loglevel/log_format/log_format_date)
     default_log_format = '[%(asctime)s.%(msecs)03d][%(levelname)s][%(name)s][%(funcName)s] %(message)s'
     default_log_format_date = '%Y-%m-%d %H:%M:%S'
