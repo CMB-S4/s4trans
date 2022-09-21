@@ -27,6 +27,10 @@ def cmdline():
     parser.add_argument("--proj_name", nargs='+', action='store', default=None, required=True,
                         help="Projection to use")
 
+    # Inject/Insert sources
+    parser.add_argument("--source_catalog", action='store', type=str, default=None,
+                        help='Coma-separated catalog with RA,DEC,FLUX to insert into frames')
+
     # Write options
     parser.add_argument("--indirect_write", action='store_true', default=False,
                         help="Use indirect write of files to /tmp before moving to destionation.")

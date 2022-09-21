@@ -34,6 +34,10 @@ def cmdline():
     parser.add_argument("--indirect_write_path", action='store', default=None,
                         help="Path for indirect write.")
 
+    # Inject/Insert sources
+    parser.add_argument("--source_catalog", action='store', type=str, default=None,
+                        help='Coma-separated catalog with RA,DEC,FLUX to insert into frames')
+
     # Logging options (loglevel/log_format/log_format_date)
     default_log_format = '[%(asctime)s.%(msecs)03d][%(levelname)s][%(name)s][%(funcName)s] %(message)s'
     default_log_format_date = '%Y-%m-%d %H:%M:%S'

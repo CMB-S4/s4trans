@@ -14,6 +14,7 @@ import numpy
 import datetime
 from spt3g.util.maths import gaussian2d
 from astropy.coordinates import SkyCoord
+import pandas as pd
 
 LOGGER = logging.getLogger(__name__)
 
@@ -45,6 +46,26 @@ class S4pipe:
 
         # Define the self.hp_array dict for later
         self.hp_array = {}
+
+        # Read in catalog
+        self.read_source_catalog()
+
+        return
+
+    def read_source_catalog(self):
+        """ Read in the csv file with ra,dec,flux"""
+        try:
+            self.config.source_catalog
+        except NameError:
+            self.logger.warning("source_catalog doesn't exist")
+            return
+
+        if self.config.source_catalog is None:
+            self.sources_coords = None
+            return
+
+        self.logger.info(f"Reading catalog with sources to insert: {self.config.source_catalog}")
+        self.sources_coords = pd.read_csv(self.config.source_catalog)
 
         return
 
@@ -213,6 +234,13 @@ class S4pipe:
         obs_id = int(date0 + int.from_bytes(s.encode(), 'little')/1e5)
         self.logger.info(f"Will add obs_id: {obs_id} to: {file}")
 
+        # Insert if catalog is present
+        if self.sources_coords is not None:
+            ra = self.sources_coords['RA']
+            dec = self.sources_coords['DEC']
+            flux = self.sources_coords['FLUX']
+            map3g = insert_sources(map3g, ra, dec, flux, norm=True)
+
         # Create a weights maps of ones
         weights = map3g.clone()
         idx = numpy.where(weights != 0)
@@ -326,11 +354,12 @@ class S4pipe:
         self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
         self.logger.info(f"New Frame:\n {frame3g}")
 
-        ra = 359.0976375
-        dec = -10.7925023
-        flux = 3
-
-        frame3g = insert_sources(frame3g, ra, dec, flux)
+        # Insert if catalog is present
+        if self.sources_coords is not None:
+            ra = self.sources_coords['RA']
+            dec = self.sources_coords['DEC']
+            flux = self.sources_coords['FLUX']
+            frame3g = insert_sources(frame3g, ra, dec, flux, norm=True)
 
         if 'FITS' in filetypes:
             self.write_fits(frame3g, file, proj_name)
@@ -447,9 +476,29 @@ def define_tiles_projection_old(ntiles=6, x_len=14000, y_len=20000,
 
 def insert_sources(frame, ra, dec, flux, norm=True, sigma=1.0, nsigma=3):
 
-    # Insert source at (ra,dec) using wcs information from frame
-    # If norm=True flux is spread over the kernel, otherwise it's the peak
-    # value at xo,yo
+    """
+    Inserts source at (ra,dec) using wcs information from frame
+    If norm=True flux is spread over the kernel, otherwise it's the peak value
+    at xo,yo. The code relies on the astropy.wcs object contained in the frame
+    get the pixel coordinates.
+
+    Arguments:
+    ---------
+    frame : 3g frame object
+        The frame where we want to inject/insert point sourcers into.
+    ra: float or list
+        The list or float of R.A. in decimal degress
+    decimal: float or list
+        The list or float of Decl. in decimal degress
+    flux: float or list
+        The list or float with total flux of the source (units TBD)
+    norm: Bool
+        Normalize fluxe
+    sigma: float
+        The size of sigma
+    nsigma: float
+        The number of sigma to extend for the kernel
+    """
 
     if not hasattr(ra, '__iter__') and not hasattr(dec, '__iter__') and not hasattr(flux, '__iter__'):
         ras = [ra]
