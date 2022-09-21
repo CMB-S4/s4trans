@@ -6,11 +6,14 @@ import types
 import time
 import math
 import os
+import sys
 from tempfile import mkdtemp
 import shutil
 import magic
 import numpy
 import datetime
+from spt3g.util.maths import gaussian2d
+from astropy.coordinates import SkyCoord
 
 LOGGER = logging.getLogger(__name__)
 
@@ -322,6 +325,13 @@ class S4pipe:
         frame3g = maps.healpix_to_flatsky(self.hp_array[file], **proj)
         self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
         self.logger.info(f"New Frame:\n {frame3g}")
+
+        ra = 359.0976375
+        dec = -10.7925023
+        flux = 3
+
+        frame3g = insert_sources(frame3g, ra, dec, flux)
+
         if 'FITS' in filetypes:
             self.write_fits(frame3g, file, proj_name)
         if 'G3' in filetypes:
@@ -435,12 +445,58 @@ def define_tiles_projection_old(ntiles=6, x_len=14000, y_len=20000,
     return proj
 
 
+def insert_sources(frame, ra, dec, flux, norm=True, sigma=1.0, nsigma=3):
+
+    # Insert source at (ra,dec) using wcs information from frame
+    # If norm=True flux is spread over the kernel, otherwise it's the peak
+    # value at xo,yo
+
+    if not hasattr(ra, '__iter__') and not hasattr(dec, '__iter__') and not hasattr(flux, '__iter__'):
+        ras = [ra]
+        decs = [dec]
+        fluxes = [flux]
+    elif len(ra) == len(dec) and len(dec) == len(flux):
+        ras = ra
+        decs = dec
+        fluxes = flux
+    else:
+        LOGGER.error("Error: ra, dec and flux must be same length")
+        sys.exit()
+
+    # Get the dimensions of the kernel, same for all objects we want to insert
+    # Taken from:
+    # https://github.com/SouthPoleTelescope/spt3g_software/blob/2a4ab81ba8ef0dd5a939b84fbbce3c76e1c99c35/transients/python/filter_tools.py#L606
+    # fwhms = {"90GHz": 1.54 * u, "150GHz": 1.13 * u, "220GHz": 1.0 * u}
+    # u = core.G3Units.arcmin
+    # fwhm = 1.0*u  # Assuming ~150GHz
+    # sigma = fwhms["150GHz"] / 2.35482 / frame3g.res
+    # ---------------------------------
+    # For now we'll just use sigma=1 and nsigma=3 as defaults in kwargs
+    dim = int(numpy.ceil(nsigma * sigma))
+    y, x = numpy.indices((2 * dim + 1, 2 * dim + 1))
+    nobjects = len(ras)
+    LOGGER.info(f"Will insert {nobjects} object(s) in 3G frame")
+    for k in range(nobjects):
+        ra = ras[k]
+        dec = decs[k]
+        flux = fluxes[k]
+
+        # Generate the kernel with fluxes
+        kernel = gaussian2d(flux, dim, dim, sigma, norm=norm)(y, x)
+
+        # Get the pixel coordinates
+        sky = SkyCoord(ra, dec, unit='deg')
+        xo, yo = frame.wcs.world_to_pixel(sky)
+        # Need to re-cast astropy/numpy objects as scalars -- and round
+        xo = round(float(xo))
+        yo = round(float(yo))
+        # Now inject the kernel at xo,yo
+        LOGGER.info(f"Inserting {dim,dim} kernel at {xo,yo} with flux {flux}")
+        numpy.asarray(frame)[yo-dim:yo+dim+1, xo-dim:xo+dim+1] = kernel
+
+    return frame
+
+
 def addid_to_frame(fr, obs_id):
     """ Add obs_id to a frame"""
     fr['ObservationID'] = obs_id
-
-
-        #frame3g['Id'] = band
-        #frame3g['ObservationID'] = obs_id
-        #frames = [frame3g]
-        #pipe.Add(lambda fr: frames.pop())
