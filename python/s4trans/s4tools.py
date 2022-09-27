@@ -7,7 +7,7 @@ import os
 import errno
 import sqlite3
 from s4trans.data_types import Fd
-
+import math
 
 LOGGER = logging.getLogger(__name__)
 
@@ -202,3 +202,35 @@ def ingest_fraction_file(filename, tablename, con=None, dbname=None, replace=Fal
     if close_con:
         con.close()
     return
+
+
+# --- Transformations provided by Tom Crawford ---
+def fac_temp2psflux(nughz, fwhm_arcmin):
+    sig_smooth = fwhm_arcmin/math.sqrt(8.*math.log(2.))/(60.*180.)*math.pi
+    area = 2.*math.pi*sig_smooth**2
+    result = dcmbrdt(nughz*1.e9)/1.e-26*area
+    return result
+
+
+def dbdt(t, f):
+    """
+    t in K,
+    f in Hz returns SI units
+    """
+    h = 6.6260755e-34
+    c = 2.99792458e+8
+    k = 1.380658e-23
+    x = h*f/(k*t)
+    return (2.0*h*f**3/c**2) / (math.exp(x)-1.0)**2 * (x/t) * math.exp(x)
+
+
+def dcmbrdt(f):
+    return dbdt(2.726, f)
+
+
+def mJy2K_CMB(flux_mJy, freq=150, fwhm=1.2):
+    """
+    Transform peak flux in mJy (10^-3 Jy) to K_CMB
+    """
+
+    return flux_mJy*1e-3/fac_temp2psflux(freq, fwhm)

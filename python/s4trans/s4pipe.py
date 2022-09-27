@@ -239,7 +239,7 @@ class S4pipe:
             ra = self.sources_coords['RA']
             dec = self.sources_coords['DEC']
             flux = self.sources_coords['FLUX']
-            map3g = insert_sources(map3g, ra, dec, flux, norm=True)
+            map3g = insert_sources(map3g, ra, dec, flux, norm=False)
 
         # Create a weights maps of ones
         weights = map3g.clone()
@@ -359,7 +359,7 @@ class S4pipe:
             ra = self.sources_coords['RA']
             dec = self.sources_coords['DEC']
             flux = self.sources_coords['FLUX']
-            frame3g = insert_sources(frame3g, ra, dec, flux, norm=True)
+            frame3g = insert_sources(frame3g, ra, dec, flux, norm=False)
 
         if 'FITS' in filetypes:
             self.write_fits(frame3g, file, proj_name)
@@ -474,7 +474,7 @@ def define_tiles_projection_old(ntiles=6, x_len=14000, y_len=20000,
     return proj
 
 
-def insert_sources(frame, ra, dec, flux, norm=True, sigma=1.0, nsigma=3):
+def insert_sources(frame, ra, dec, flux, norm=True, sigma=1.5, nsigma=2):
 
     """
     Inserts source at (ra,dec) using wcs information from frame
@@ -491,7 +491,7 @@ def insert_sources(frame, ra, dec, flux, norm=True, sigma=1.0, nsigma=3):
     decimal: float or list
         The list or float of Decl. in decimal degress
     flux: float or list
-        The list or float with total flux of the source (units TBD)
+        The list or float with total flux of the source (units mJy)
     norm: Bool
         Normalize fluxe
     sigma: float
@@ -528,7 +528,9 @@ def insert_sources(frame, ra, dec, flux, norm=True, sigma=1.0, nsigma=3):
     for k in range(nobjects):
         ra = ras[k]
         dec = decs[k]
-        flux = fluxes[k]
+
+        # Transform the flux from mJy to K_CMB
+        flux = s4tools.mJy2K_CMB(fluxes[k], freq=150, fwhm=1.0)
 
         # Generate the kernel with fluxes
         kernel = gaussian2d(flux, dim, dim, sigma, norm=norm)(y, x)
