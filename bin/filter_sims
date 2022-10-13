@@ -50,8 +50,8 @@ def cmdline():
 
     # Check environmental variables for indirect_write
     if args.indirect_write_path is None and args.indirect_write is True:
-        if 'S4_CUTTER_INDIRECT_WRITE_PATH' in os.environ:
-            args.indirect_write_path = os.environ['S4_CUTTER_INDIRECT_WRITE_PATH']
+        if 'S4TRANS_INDIRECT_WRITE_PATH' in os.environ:
+            args.indirect_write_path = os.environ['S4TRANS_INDIRECT_WRITE_PATH']
         else:
             args.indirect_write_path = '/tmp'
 

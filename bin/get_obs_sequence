@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+
+"""
+Utility script to get CSV file with obsering sequence from DC1
+To run on the ICC:
+
+# SETTING scans
+%> cd /projects/caps/cmbs4/sims/healpix_maps
+%> get_obs_sequence "*SETTING*.fits.gz"
+%> mv obs_seq.csv obs_seq_SETTING.csv
+
+# RISING scans
+%> cd /projects/caps/cmbs4/sims/healpix_maps
+%> get_obs_sequence ""*RISING*.fits.gz"
+%> mv obs_seq.csv obs_seq_RISING.csv
+"""
+
+import sys
+import csv
+import glob
+import subprocess
+
+pattern = sys.argv[1]
+
+# To get them sorted as when using "ls -v" natural order
+proc = subprocess.Popen(['ls', '-v'] + glob.glob(pattern), stdout=subprocess.PIPE)
+files = proc.stdout.readlines()
+
+csvfile = 'obs_seq.csv'
+f = open(csvfile, 'w')
+writer = csv.writer(f)
+
+k = 0
+header = ['counter', 'filename', 'scan_type', 'obs_seq', 'ele', 'n1', 'n2']
+writer.writerow(header)
+for file in files:
+    # Decode as utf-8 and remove the newline
+    file = file.decode('utf-8').strip()
+    scan_type = file.split('_')[1]
+    obs_seq = file.split('_')[3]
+    ele = obs_seq.split('-')[0]
+    n1 = obs_seq.split('-')[1]
+    n2 = obs_seq.split('-')[2]
+    writer.writerow([k, file, scan_type, obs_seq, ele, n1, n2])
+    print(k, file, scan_type, obs_seq, ele, n1, n2)
+    k += 1
+
+print(f"# Wrote: {csvfile}")

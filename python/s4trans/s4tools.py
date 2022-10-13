@@ -8,6 +8,7 @@ import errno
 import sqlite3
 from s4trans.data_types import Fd
 import math
+import pandas as pd
 
 LOGGER = logging.getLogger(__name__)
 
@@ -24,6 +25,11 @@ _table_statement = _table_statement.rstrip(',\n')
 _insert_row = """
 INSERT{or_replace}INTO {tablename} values ({values})
 """
+
+try:
+    S4TRANS_DIR = os.environ['S4TRANS_DIR']
+except KeyError:
+    S4TRANS_DIR = __file__.split('python')[0]
 
 
 def create_logger(logfile=None, level=logging.NOTSET, log_format=None, log_format_date=None):
@@ -202,6 +208,20 @@ def ingest_fraction_file(filename, tablename, con=None, dbname=None, replace=Fal
     if close_con:
         con.close()
     return
+
+
+def load_obs_seq():
+    """
+    Loads the csv files with the simulatons's observing sequence.
+    These files are generated at the ICC using the script `get_obs_sequence`
+    """
+    scans = ['RISING', 'SETTING']
+    obs_seq = {}
+    for scan in scans:
+        csvfile = os.path.join(S4TRANS_DIR, f"etc/obs_seq_{scan}.csv")
+        LOGGER.info(f"Reading {csvfile}")
+        obs_seq[scan] = pd.read_csv(csvfile)
+    return obs_seq
 
 
 # --- Transformations provided by Tom Crawford ---

@@ -48,7 +48,7 @@ class S4pipe:
         self.hp_array = {}
 
         # Read in catalog
-        self.read_source_catalog()
+        self.obs_seq = self.read_source_catalog()
 
         return
 
@@ -67,6 +67,8 @@ class S4pipe:
         self.logger.info(f"Reading catalog with sources to insert: {self.config.source_catalog}")
         self.sources_coords = pd.read_csv(self.config.source_catalog)
 
+        # Now we read the observation sequence
+        s4tools.load_obs_seq()
         return
 
     def check_input_files(self):
@@ -228,11 +230,7 @@ class S4pipe:
         self.set_outname(file, f"flt_{proj_name}", filetype='G3')
 
         # Get the obs_id based on the name of the file
-        date0 = datetime.datetime(2013, 1, 1, 0, 0).timestamp()
-        f = os.path.basename(file)
-        s = ''.join(f.split('_')[3].split('-'))
-        obs_id = int(date0 + int.from_bytes(s.encode(), 'little')/1e5)
-        self.logger.info(f"Will add obs_id: {obs_id} to: {file}")
+        obs_id = get_obs_id(file)
 
         # Insert if catalog is present
         if self.sources_coords is not None:
@@ -353,6 +351,9 @@ class S4pipe:
         frame3g = maps.healpix_to_flatsky(self.hp_array[file], **proj)
         self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
         self.logger.info(f"New Frame:\n {frame3g}")
+
+        # Get the obs_id based on the name of the file
+        # obs_id = get_obs_id(file)
 
         # Insert if catalog is present
         if self.sources_coords is not None:
@@ -551,3 +552,14 @@ def insert_sources(frame, ra, dec, flux, norm=True, sigma=1.5, nsigma=2):
 def addid_to_frame(fr, obs_id):
     """ Add obs_id to a frame"""
     fr['ObservationID'] = obs_id
+
+
+def get_obs_id(file):
+    """ Common method to get obs_id based on the name of the file"""
+    date0 = datetime.datetime(2013, 1, 1, 0, 0).timestamp()
+    f = os.path.basename(file)
+    s = ''.join(f.split('_')[3].split('-'))
+    obs_id = int(date0 + int.from_bytes(s.encode(), 'little')/1e5)
+    print(int.from_bytes(s.encode(), 'little')/1e5)
+    LOGGER.info(f"Will add obs_id: {obs_id} to: {file}")
+    return obs_id
