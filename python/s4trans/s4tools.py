@@ -9,6 +9,7 @@ import sqlite3
 from s4trans.data_types import Fd
 import math
 import pandas as pd
+import numpy as np
 
 LOGGER = logging.getLogger(__name__)
 
@@ -215,6 +216,7 @@ def load_obs_seq():
     Loads the csv files with the simulatons's observing sequence.
     These files are generated at the ICC using the script `get_obs_sequence`
     """
+    LOGGER.info("Loading observation sequence")
     scans = ['RISING', 'SETTING']
     obs_seq = {}
     for scan in scans:
@@ -254,3 +256,12 @@ def mJy2K_CMB(flux_mJy, freq=150, fwhm=1.2):
     """
 
     return flux_mJy*1e-3/fac_temp2psflux(freq, fwhm)
+
+
+def gaussian(x, sigma, peak_norm=True):
+    """ Return the normalized Gaussian with standard deviation sigma. """
+    c = np.sqrt(2 * np.pi)
+    gauss = np.exp(-0.5 * (x / sigma)**2) / sigma / c
+    if peak_norm:
+        gauss = gauss*c*sigma
+    return gauss

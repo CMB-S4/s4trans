@@ -48,8 +48,7 @@ class S4pipe:
         self.hp_array = {}
 
         # Read in catalog
-        self.obs_seq = self.read_source_catalog()
-
+        self.read_source_catalog()
         return
 
     def read_source_catalog(self):
@@ -68,8 +67,28 @@ class S4pipe:
         self.sources_coords = pd.read_csv(self.config.source_catalog)
 
         # Now we read the observation sequence
-        s4tools.load_obs_seq()
+        self.obs_seq = s4tools.load_obs_seq()
         return
+
+    def get_flux_scale(self, filename, obs_key, obs_width, scan, nsigma=2):
+
+        filename = os.path.basename(filename)
+
+        # Get the index for the file with the peak flux
+        k = numpy.where(self.obs_seq[scan]['obs_seq'] == obs_key)[0][0]
+        files = self.obs_seq[scan]['filename'][k-obs_width: k+obs_width+1].to_numpy()
+        x = numpy.linspace(-nsigma*obs_width, nsigma*obs_width, 2*obs_width+1)
+        g = s4tools.gaussian(x, obs_width)
+        idx = numpy.where(files == filename)[0][0]
+        scale = g[idx]
+        return scale
+
+    def get_flux_scales(self, filename, scan='RISING', nsigma=2):
+        scales = []
+        for row in self.sources_coords.itertuples():
+            scale = self.get_flux_scale(filename, row.obs_key, row.obs_width, scan=row.scan, nsigma=nsigma)
+            scales.append(scale)
+        return numpy.asarray(scales)
 
     def check_input_files(self):
         " Check if the inputs are a list or a file with a list"
@@ -237,7 +256,9 @@ class S4pipe:
             ra = self.sources_coords['RA']
             dec = self.sources_coords['DEC']
             flux = self.sources_coords['FLUX']
-            map3g = insert_sources(map3g, ra, dec, flux, norm=False)
+            scale = self.get_flux_scales(file, scan='RISING', nsigma=2)
+            flux_scaled = flux*scale
+            map3g = insert_sources(map3g, ra, dec, flux_scaled, norm=False)
 
         # Create a weights maps of ones
         weights = map3g.clone()
@@ -360,7 +381,9 @@ class S4pipe:
             ra = self.sources_coords['RA']
             dec = self.sources_coords['DEC']
             flux = self.sources_coords['FLUX']
-            frame3g = insert_sources(frame3g, ra, dec, flux, norm=False)
+            scale = self.get_flux_scales(file, scan='RISING', nsigma=2)
+            flux_scaled = flux*scale
+            frame3g = insert_sources(frame3g, ra, dec, flux_scaled, norm=False)
 
         if 'FITS' in filetypes:
             self.write_fits(frame3g, file, proj_name)
@@ -560,6 +583,5 @@ def get_obs_id(file):
     f = os.path.basename(file)
     s = ''.join(f.split('_')[3].split('-'))
     obs_id = int(date0 + int.from_bytes(s.encode(), 'little')/1e5)
-    print(int.from_bytes(s.encode(), 'little')/1e5)
     LOGGER.info(f"Will add obs_id: {obs_id} to: {file}")
     return obs_id

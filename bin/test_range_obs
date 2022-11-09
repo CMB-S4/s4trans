@@ -1,17 +1,55 @@
 #!/usr/bin/env python
 from s4trans import s4tools
-import numpy
+import numpy as np
 
+
+def gaussian(x, sigma, peak_norm=True):
+    """ Return the normalized Gaussian with standard deviation sigma. """
+    c = np.sqrt(2 * np.pi)
+    gauss = np.exp(-0.5 * (x / sigma)**2) / sigma / c
+    if peak_norm:
+        gauss = gauss*c*sigma
+    return gauss
+
+
+# Load the observation sequence
 obs_seq = s4tools.load_obs_seq()
 
+print(obs_seq)
+
+for row in obs_seq['RISING'].itertuples():
+    print("item", row)
+    print(row.filename)
+
+exit()
+
+# Define the peak value
 obs_key = '40-7-12'
-width = 12
+obs_width = 4  # with of the observation, number of scans
 scan = 'RISING'
 
-k = numpy.where(obs_seq[scan]['obs_seq'] == obs_key)[0][0]
+# Get the index for the file with the peak flux
+k = np.where(obs_seq[scan]['obs_seq'] == obs_key)[0][0]
 
-print(type(k))
+print(f"type(k): {type(k)}")
+print(f"k: {k}")
 print(obs_seq[scan]['filename'])
 
-files = obs_seq[scan]['filename'][k-12: k+12]
-print(files)
+# Select all files between peak_flux-width and peak_flux+width
+files = obs_seq[scan]['filename'][k-obs_width: k+obs_width+1].to_numpy()
+print(f"files: \n{files}")
+print(f"nfiles: {len(files)}")
+print(type(files))
+
+nsigma = 2
+x = np.linspace(-nsigma*obs_width, nsigma*obs_width, 2*obs_width+1)
+g = gaussian(x, obs_width)
+
+print(len(x), x)
+print(g)
+
+file = 'mapmaker_RISING_SCAN_40-7-12_noiseweighted_map_nside4096.fits.gz'
+idx = np.where(files == file)[0][0]
+print(idx)
+print(file)
+print(files[idx])
