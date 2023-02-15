@@ -342,7 +342,7 @@ class S4pipe:
             self.logger.info(f"Doing: {nfile}/{self.config.nfiles} files")
 
             t1 = time.time()
-            for proj_name, proj in self.proj.items():
+            for proj_name in self.config.proj_name:
                 try:
                     on_fraction = self.get_db_onfraction(file, proj_name)
                 except Exception:
