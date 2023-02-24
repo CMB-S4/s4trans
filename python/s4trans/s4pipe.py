@@ -64,13 +64,13 @@ class S4pipe:
             return
 
         self.logger.info(f"Reading catalog with sources to insert: {self.config.source_catalog}")
-        self.sources_coords = pd.read_csv(self.config.source_catalog)
+        self.sources_coords = pd.read_csv(self.config.source_catalog, skipinitialspace=True)
 
         # Now we read the observation sequence
         self.obs_seq = s4tools.load_obs_seq()
         return
 
-    def get_flux_scale(self, filename, obs_key, obs_width, scan, nsigma=2):
+    def get_flux_scale(self, filename, obs_key, obs_width, scan, nsigma=3):
 
         filename = os.path.basename(filename)
 
@@ -79,11 +79,16 @@ class S4pipe:
         files = self.obs_seq[scan]['filename'][k-obs_width: k+obs_width+1].to_numpy()
         x = numpy.linspace(-nsigma*obs_width, nsigma*obs_width, 2*obs_width+1)
         g = s4tools.gaussian(x, obs_width)
-        idx = numpy.where(files == filename)[0][0]
-        scale = g[idx]
+        # Add a try and execpt
+        if filename in files:
+            idx = numpy.where(files == filename)[0][0]
+            scale = g[idx]
+        else:
+            self.logger.info(f"{filename} beyond lightcurve, setting scale=0")
+            scale = 0
         return scale
 
-    def get_flux_scales(self, filename, scan='RISING', nsigma=2):
+    def get_flux_scales(self, filename, scan='RISING', nsigma=3):
         scales = []
         for row in self.sources_coords.itertuples():
             scale = self.get_flux_scale(filename, row.obs_key, row.obs_width, scan=row.scan, nsigma=nsigma)
@@ -253,12 +258,10 @@ class S4pipe:
 
         # Insert if catalog is present
         if self.sources_coords is not None:
-            ra = self.sources_coords['RA']
-            dec = self.sources_coords['DEC']
-            flux = self.sources_coords['FLUX']
-            scale = self.get_flux_scales(file, scan='RISING', nsigma=2)
-            flux_scaled = flux*scale
-            map3g = insert_sources(map3g, ra, dec, flux_scaled, norm=False)
+            scale = self.get_flux_scales(file, scan='RISING', nsigma=3)
+            flux_scaled = self.sources_coords['FLUX']*scale
+            map3g = insert_sources(map3g, self.sources_coords, flux_scaled, norm=False)
+            self.logger.info("Done inserting sources")
 
         # Create a weights maps of ones
         weights = map3g.clone()
@@ -267,6 +270,7 @@ class S4pipe:
         weightmap = maps.G3SkyMapWeights()
         weightmap.TT = weights
 
+        self.logger.info("Loading pipe for filtering")
         pipe = core.G3Pipeline()
         pipe.Add(core.G3InfiniteSource, n=0)
         pipe.Add(maps.InjectMaps, map_id=band, maps_in=[map3g, weightmap])
@@ -277,6 +281,7 @@ class S4pipe:
                  bands=[band],  # or just band
                  subtract_coadd=False)
         pipe.Add(core.G3Writer, filename=self.outname_tmp)
+        self.logger.info("Executing .Run()")
         pipe.Run()
 
         # In case we have indirect_write
@@ -359,7 +364,7 @@ class S4pipe:
                     self.logger.info(f"Skipping FITS for projection: {proj_name}")
 
             self.logger.info(f"Done with {file} time: {s4tools.elapsed_time(t1)} ")
-        nfile += 1
+            nfile += 1
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
     def project_sim_file(self, file, proj_name, filetypes):
@@ -369,26 +374,26 @@ class S4pipe:
         self.load_healpix_map(file)
         t1 = time.time()
         self.logger.info(f"Transforming Healpix to G3 frame for projection {proj_name}")
-        frame3g = maps.healpix_to_flatsky(self.hp_array[file], **proj)
+        map3g = maps.healpix_to_flatsky(self.hp_array[file], **proj)
         self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
-        self.logger.info(f"New Frame:\n {frame3g}")
+        self.logger.info(f"New Frame:\n {map3g}")
 
         # Get the obs_id based on the name of the file
         # obs_id = get_obs_id(file)
 
         # Insert if catalog is present
         if self.sources_coords is not None:
-            ra = self.sources_coords['RA']
-            dec = self.sources_coords['DEC']
-            flux = self.sources_coords['FLUX']
-            scale = self.get_flux_scales(file, scan='RISING', nsigma=2)
-            flux_scaled = flux*scale
-            frame3g = insert_sources(frame3g, ra, dec, flux_scaled, norm=False)
+            scale = self.get_flux_scales(file, scan='RISING', nsigma=3)
+            flux_scaled = self.sources_coords['FLUX']*scale
+            map3g = insert_sources(map3g, self.sources_coords, flux_scaled, norm=False)
+            self.logger.info("Done inserting sources")
 
         if 'FITS' in filetypes:
-            self.write_fits(frame3g, file, proj_name)
+            self.logger.info(f"Preparing to write FITS: {file}")
+            self.write_fits(map3g, file, proj_name)
         if 'G3' in filetypes:
-            self.write_g3(frame3g, file, proj_name)
+            self.logger.info(f"Preparing to write G3: {file}")
+            self.write_g3(map3g, file, proj_name)
         self.logger.info(f"Projecting of file: {file} done: {s4tools.elapsed_time(t0)} ")
         return
 
@@ -498,7 +503,7 @@ def define_tiles_projection_old(ntiles=6, x_len=14000, y_len=20000,
     return proj
 
 
-def insert_sources(frame, ra, dec, flux, norm=True, sigma=1.5, nsigma=2):
+def insert_sources(frame, coords, flux, norm=True, sigma=1.5, nsigma=3):
 
     """
     Inserts source at (ra,dec) using wcs information from frame
@@ -510,10 +515,8 @@ def insert_sources(frame, ra, dec, flux, norm=True, sigma=1.5, nsigma=2):
     ---------
     frame : 3g frame object
         The frame where we want to inject/insert point sourcers into.
-    ra: float or list
-        The list or float of R.A. in decimal degress
-    decimal: float or list
-        The list or float of Decl. in decimal degress
+    coords: pandas object
+        with RA/DEC or XIMAGE/YIMAGE (floats)
     flux: float or list
         The list or float with total flux of the source (units mJy)
     norm: Bool
@@ -524,16 +527,21 @@ def insert_sources(frame, ra, dec, flux, norm=True, sigma=1.5, nsigma=2):
         The number of sigma to extend for the kernel
     """
 
-    if not hasattr(ra, '__iter__') and not hasattr(dec, '__iter__') and not hasattr(flux, '__iter__'):
-        ras = [ra]
-        decs = [dec]
-        fluxes = [flux]
-    elif len(ra) == len(dec) and len(dec) == len(flux):
-        ras = ra
-        decs = dec
-        fluxes = flux
+    try:
+        ra = coords['RA']
+        dec = coords['DEC']
+        # Get the pixel coordinates
+        sky = SkyCoord(ra, dec, unit='deg')
+        ximage, yimage = frame.wcs.world_to_pixel(sky)
+
+    except Exception:
+        ximage = coords['XIMAGE']
+        yimage = coords['YIMAGE']
+
+    if len(ximage) == len(yimage) and len(ximage) == len(flux):
+        pass
     else:
-        LOGGER.error("Error: ra, dec and flux must be same length")
+        LOGGER.error("Error: xo,yo (ra, dec) and flux must be same length")
         sys.exit()
 
     # Get the dimensions of the kernel, same for all objects we want to insert
@@ -547,26 +555,27 @@ def insert_sources(frame, ra, dec, flux, norm=True, sigma=1.5, nsigma=2):
     # For now we'll just use sigma=1 and nsigma=3 as defaults in kwargs
     dim = int(numpy.ceil(nsigma * sigma))
     y, x = numpy.indices((2 * dim + 1, 2 * dim + 1))
-    nobjects = len(ras)
-    LOGGER.info(f"Will insert {nobjects} object(s) in 3G frame")
+    nobjects = len(ximage)
+    LOGGER.info(f"Will try to insert {nobjects} object(s) in 3G frame")
     for k in range(nobjects):
-        ra = ras[k]
-        dec = decs[k]
+
+        # Need to re-cast astropy/numpy objects as scalars -- and round
+        xo = round(float(ximage[k]))
+        yo = round(float(yimage[k]))
 
         # Transform the flux from mJy to K_CMB
-        flux = s4tools.mJy2K_CMB(fluxes[k], freq=150, fwhm=1.0)
+        flux_cmb = s4tools.mJy2K_CMB(flux[k], freq=150, fwhm=1.0)
 
         # Generate the kernel with fluxes
-        kernel = gaussian2d(flux, dim, dim, sigma, norm=norm)(y, x)
+        kernel = gaussian2d(flux_cmb, dim, dim, sigma, norm=norm)(y, x)
 
-        # Get the pixel coordinates
-        sky = SkyCoord(ra, dec, unit='deg')
-        xo, yo = frame.wcs.world_to_pixel(sky)
-        # Need to re-cast astropy/numpy objects as scalars -- and round
-        xo = round(float(xo))
-        yo = round(float(yo))
+        # Ignore when flux == 0
+        if flux_cmb == 0:
+            LOGGER.info(f"Skipping {dim,dim} kernel at {xo,yo} with flux {flux_cmb}")
+            continue
+
         # Now inject the kernel at xo,yo
-        LOGGER.info(f"Inserting {dim,dim} kernel at {xo,yo} with flux {flux}")
+        LOGGER.info(f"Inserting {dim,dim} kernel at {xo,yo} with flux {flux_cmb}")
         numpy.asarray(frame)[yo-dim:yo+dim+1, xo-dim:xo+dim+1] = kernel
 
     return frame
