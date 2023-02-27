@@ -240,7 +240,7 @@ class S4pipe:
         on_fraction = frame3g.npix_nonzero/frame3g.size
         return on_fraction
 
-    def filter_sim_file(self, file, proj_name, band='150GHz'):
+    def filter_sim_file(self, file, proj_name, filetypes, band='150GHz'):
         """Filter Simulations using transient filtering method"""
         t0 = time.time()
         proj = self.proj[proj_name]
@@ -249,9 +249,6 @@ class S4pipe:
         self.logger.info(f"Transforming Healpix to G3 frame for projection {proj_name}")
         map3g = maps.healpix_to_flatsky(self.hp_array[file], **proj)
         self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
-
-        # Get the outname
-        self.set_outname(file, f"flt_{proj_name}", filetype='G3')
 
         # Get the obs_id based on the name of the file
         obs_id = get_obs_id(file)
@@ -280,17 +277,39 @@ class S4pipe:
         pipe.Add(transients.TransientMapFiltering,
                  bands=[band],  # or just band
                  subtract_coadd=False)
-        pipe.Add(core.G3Writer, filename=self.outname_tmp)
+
+        if 'FITS' in filetypes:
+            # Get the outname
+            self.set_outname(file, f"flt_{proj_name}", filetype='FITS')
+            self.logger.info(f"Preparing to write FITS: {file}")
+            pipe.Add(maps.fitsio.SaveMapFrame, output_file=self.outname_tmp,
+                     compress='GZIP_2', overwrite=True)
+        if 'G3' in filetypes:
+            # Get the outname
+            self.set_outname(file, f"flt_{proj_name}", filetype='G3')
+            self.logger.info(f"Preparing to write G3: {file}")
+            pipe.Add(core.G3Writer, filename=self.outname_tmp)
+
         self.logger.info("Executing .Run()")
         pipe.Run()
+        del pipe
 
         # In case we have indirect_write
-        self.move_outname()
+        if 'FITS' in filetypes:
+            # Get the outname
+            self.set_outname(file, f"flt_{proj_name}", filetype='FITS')
+            self.move_outname()
+
+        if 'G3' in filetypes:
+            # Get the outname
+            self.set_outname(file, f"flt_{proj_name}", filetype='G3')
+            self.move_outname()
+
         self.logger.info(f"Filtering file {file} done: {s4tools.elapsed_time(t0)} ")
         self.logger.info(f"Created file: {self.outname}")
         return
 
-    def filter_sims(self):
+    def filter_sims(self, filetypes=['FITS', 'G3']):
         """Run function self.filter_sim_file for a set of files and filters"""
         t0 = time.time()
         # Check input files vs file list
@@ -315,7 +334,7 @@ class S4pipe:
             for proj_name in self.config.proj_name:
                 on_fraction = self.get_db_onfraction(file, proj_name)
                 if on_fraction > self.config.onfracion_thresh and on_fraction is not None:
-                    self.filter_sim_file(file, proj_name)
+                    self.filter_sim_file(file, proj_name, filetypes)
                 else:
                     self.logger.info(f"Skipping proj:{proj_name} for file: {file}")
 
@@ -358,7 +377,6 @@ class S4pipe:
                 if on_fraction > self.config.onfracion_thresh and on_fraction is not None:
                     self.logger.info(f"Fraction of non-zero pixels above threshold: {on_fraction}")
                     self.project_sim_file(file, proj_name, filetypes)
-
                 else:
                     self.logger.info(f"Fraction of non-zero pixels below threshold: {on_fraction}")
                     self.logger.info(f"Skipping FITS for projection: {proj_name}")
@@ -395,6 +413,7 @@ class S4pipe:
             self.logger.info(f"Preparing to write G3: {file}")
             self.write_g3(map3g, file, proj_name)
         self.logger.info(f"Projecting of file: {file} done: {s4tools.elapsed_time(t0)} ")
+        del map3g
         return
 
     def ingest_onfraction(self):
