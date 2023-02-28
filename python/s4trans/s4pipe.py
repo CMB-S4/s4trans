@@ -53,10 +53,11 @@ class S4pipe:
 
     def read_source_catalog(self):
         """ Read in the csv file with ra,dec,flux"""
+
         try:
             self.config.source_catalog
-        except NameError:
-            self.logger.warning("source_catalog doesn't exist")
+        except AttributeError:
+            self.logger.warning("--source_catalog not an option")
             return
 
         if self.config.source_catalog is None:
@@ -70,28 +71,30 @@ class S4pipe:
         self.obs_seq = s4tools.load_obs_seq()
         return
 
-    def get_flux_scale(self, filename, obs_key, obs_width, scan, nsigma=3):
+    def get_flux_scale(self, filename, obs_key, obs_width, proj_name, scan, nsigma=3):
 
         filename = os.path.basename(filename)
+        simID = os.path.basename(filename).split(".")[0]
 
-        # Get the index for the file with the peak flux
-        k = numpy.where(self.obs_seq[scan]['obs_seq'] == obs_key)[0][0]
-        files = self.obs_seq[scan]['filename'][k-obs_width: k+obs_width+1].to_numpy()
+        # Get the files from where match the scaling
+        files = self.get_files_to_insert(obs_key, obs_width, scan, proj_name)
         x = numpy.linspace(-nsigma*obs_width, nsigma*obs_width, 2*obs_width+1)
         g = s4tools.gaussian(x, obs_width)
         # Add a try and execpt
-        if filename in files:
-            idx = numpy.where(files == filename)[0][0]
+        if simID in files:
+            idx = numpy.where(files == simID)[0][0]
             scale = g[idx]
         else:
             self.logger.info(f"{filename} beyond lightcurve, setting scale=0")
             scale = 0
+        self.logger.info(f"Flux scale:{scale} for: {simID},{obs_key},w:{obs_width}")
         return scale
 
-    def get_flux_scales(self, filename, scan='RISING', nsigma=3):
+    def get_flux_scales(self, filename, proj_name, scan='RISING', nsigma=3):
         scales = []
         for row in self.sources_coords.itertuples():
-            scale = self.get_flux_scale(filename, row.obs_key, row.obs_width, scan=row.scan, nsigma=nsigma)
+            scale = self.get_flux_scale(filename, row.obs_key, row.obs_width, proj_name,
+                                        scan=row.scan, nsigma=nsigma)
             scales.append(scale)
         return numpy.asarray(scales)
 
@@ -255,7 +258,7 @@ class S4pipe:
 
         # Insert if catalog is present
         if self.sources_coords is not None:
-            scale = self.get_flux_scales(file, scan='RISING', nsigma=3)
+            scale = self.get_flux_scales(file, proj_name, scan='RISING', nsigma=3)
             flux_scaled = self.sources_coords['FLUX']*scale
             map3g = insert_sources(map3g, self.sources_coords, flux_scaled, norm=False)
             self.logger.info("Done inserting sources")
@@ -401,7 +404,7 @@ class S4pipe:
 
         # Insert if catalog is present
         if self.sources_coords is not None:
-            scale = self.get_flux_scales(file, scan='RISING', nsigma=3)
+            scale = self.get_flux_scales(file, proj_name, scan='RISING', nsigma=3)
             flux_scaled = self.sources_coords['FLUX']*scale
             map3g = insert_sources(map3g, self.sources_coords, flux_scaled, norm=False)
             self.logger.info("Done inserting sources")
@@ -433,7 +436,22 @@ class S4pipe:
             nfile += 1
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
-    def get_db_onfraction(self, filename, proj_name):
+    def get_db_onfractions(self, proj_name):
+
+        "Get the on fraction"
+        if self.dbhandle is None:
+            self.dbhandle = s4tools.connect_db(self.config.dbname)
+
+        # Clean up the name to get the SIMID
+        query = f'select SIMID, fraction from {self.config.tablename}'
+        query = query + f' where PROJ="{proj_name}"'
+        # query = query + f' where SIMID like "%{scan}%" and PROJ="{proj_name}"'
+        # query = query + f' and fraction>{self.config.onfracion_thresh}'
+        self.logger.info(f"Will run query:\n\t{query}")
+        rec = s4tools.query2rec(query, self.dbhandle)
+        return rec
+
+    def get_db_onfraction(self, filename, proj_name, verb=True):
 
         "Get the on fraction"
         if self.dbhandle is None:
@@ -449,12 +467,68 @@ class S4pipe:
         cur.execute(query)
         try:
             fraction = cur.fetchone()[0]
-            self.logger.info(f"Fraction: {fraction} for {filename}")
+            if verb:
+                self.logger.info(f"Fraction: {fraction} for {filename}")
         except TypeError:
             fraction = None
-            self.logger.warning(f"on-fraction not found for {filename} and {proj_name}")
+            if verb:
+                self.logger.warning(f"on-fraction not found for {filename} and {proj_name}")
         cur.close()
         return fraction
+
+    def select_files_threshold(self, obs_key, obs_width, scan, proj_name):
+        """
+        Get the files above fraction thresold
+        """
+        # Read the observation sequence only once
+        try:
+            obs_seq = self.obs_seq
+            self.logger.info("Observing sequence already loaded -- skipping")
+        except Exception:
+            obs_seq = s4tools.load_obs_seq()
+
+        # Select only files above fraction threshold
+        try:
+            rec = self.rec_onfractions
+            self.logger.info(f"On fractions computed for: {self.config.onfracion_thresh} -- skipping")
+        except Exception:
+            self.rec_onfractions = self.get_db_onfractions(proj_name)
+            self.logger.info(f"Computing on fraction for: {self.config.onfracion_thresh}")
+            rec = self.rec_onfractions
+
+        # Now we match using the observing sequence order and select
+        # based on fraction threshold
+        selection = []
+        nsequence = len(obs_seq[scan]['filename'])
+        for i in range(nsequence):
+            file = obs_seq[scan]['filename'][i]
+            seqid = obs_seq[scan]['obs_seq'][i]
+            simID = os.path.basename(file).split(".")[0]
+            # Match by SIMID for fraction
+            idx = numpy.where(rec['SIMID'] == simID)[0][0]
+            fraction = rec['FRACTION'][idx]
+            if fraction > self.config.onfracion_thresh:
+                selection.append((simID, seqid, fraction))
+
+        # Recast the selected data as a numpy record array
+        data_selected = numpy.rec.array(selection, names=['id', 'obs_seq', 'fraction'])
+        return data_selected
+
+    def get_files_to_insert(self, obs_key, obs_width, scan, proj_name):
+        """
+        Get the files to insert souces that match the fraction threshold
+        """
+
+        # Get the filtered universe of files we want to select from
+        data_selected = self.select_files_threshold(obs_key, obs_width, scan, proj_name)
+
+        # Get the index for the file with the peak flux
+        k = numpy.where(data_selected['obs_seq'] == obs_key)[0][0]
+
+        # Select all files between peak_flux-width and peak_flux+width
+        files = data_selected['id'][k-obs_width: k+obs_width+1]
+        self.logger.info(f"Found nfiles:{len(files)} for {obs_key},{obs_width},{scan},{proj_name}")
+        return files
 
 
 def define_tiles_projection(x_len=5000, y_len=5000,

@@ -9,10 +9,13 @@ import os
 def cmdline():
 
     parser = argparse.ArgumentParser(description="CMBS4 transient testing pipeline")
-    parser.add_argument("files", nargs='+',
-                        help="Filename(s) to preocess")
-    parser.add_argument("--outdir", type=str, action='store', default=None,
-                        required=True, help="Location for output files")
+    parser.add_argument("obs_key", type=str, action='store',
+                        help="The central observation keyID")
+    parser.add_argument("--obs_width", type=int, action='store', default=15,
+                        help="Lightcurve observation width")
+    parser.add_argument("--scan", action="store", default='RISING', type=str.upper,
+                        choices=["RISING", "SETTING"],
+                        help="Scan type [RISING/SETTING]")
 
     # DB options
     dbname = os.path.join(os.environ['HOME'], "db/s4sims_DC1.db")
@@ -24,20 +27,8 @@ def cmdline():
     # Fraction threshold
     parser.add_argument("--onfracion_thresh", action='store', type=float, default=0.8,
                         help="On Fraction threshold")
-    parser.add_argument("--proj_name", nargs='+', action='store', default=None, required=True,
+    parser.add_argument("--proj_name", action='store', type=str, default=None,
                         help="Projection to use")
-
-    # Write options
-    parser.add_argument("--indirect_write", action='store_true', default=False,
-                        help="Use indirect write of files to /tmp before moving to destionation.")
-    parser.add_argument("--indirect_write_path", action='store', default=None,
-                        help="Path for indirect write.")
-    parser.add_argument("--output_filetypes", nargs='+', default=['FITS'],
-                        help="Output filetype [G3, FITS]")
-
-    # Inject/Insert sources
-    parser.add_argument("--source_catalog", action='store', type=str, default=None,
-                        help='Coma-separated catalog with RA,DEC,FLUX to insert into frames')
 
     # Logging options (loglevel/log_format/log_format_date)
     default_log_format = '[%(asctime)s.%(msecs)03d][%(levelname)s][%(name)s][%(funcName)s] %(message)s'
@@ -49,21 +40,11 @@ def cmdline():
                         help="Format for logging")
     parser.add_argument("--log_format_date", action="store", type=str, default=default_log_format_date,
                         help="Format for date section of logging")
+
+    parser.add_argument("--output", type=str, action='store', default=None,
+                        help="File with output list")
     args = parser.parse_args()
 
-    # Check environmental variables for indirect_write
-    if args.indirect_write_path is None and args.indirect_write is True:
-        if 'S4_CUTTER_INDIRECT_WRITE_PATH' in os.environ:
-            args.indirect_write_path = os.environ['S4_CUTTER_INDIRECT_WRITE_PATH']
-        else:
-            args.indirect_write_path = '/tmp'
-
-    # Define the prefix
-    if args.indirect_write:
-        args.indirect_write_prefix = os.path.join(args.indirect_write_path, 's4pipe-')
-
-    #  The number of files
-    args.nfiles = len(args.files)
     return args
 
 
@@ -75,4 +56,12 @@ if __name__ == "__main__":
     # Get the command-line arguments
     args = cmdline()
     p = s4pipe.S4pipe(**args.__dict__)
-    p.project_sims(filetypes=args.output_filetypes)
+    files = p.get_files_to_insert(args.obs_key, args.obs_width, args.scan, args.proj_name)
+
+    if args.output is None:
+        args.output = f"selected_files_{args.obs_key}_{args.proj_name}.dat"
+
+    print(f"Will write files to: {args.output}")
+    with open(args.output, 'w') as f:
+        for file in files:
+            f.write(f"{file}\n")
