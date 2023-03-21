@@ -1,5 +1,5 @@
 __author__ = "Felipe Menanteau"
-__version__ = "0.1.8"
+__version__ = "0.2.0"
 version = __version__
 
 from . import s4pipe

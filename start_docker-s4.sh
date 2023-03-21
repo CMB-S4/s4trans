@@ -1,5 +1,5 @@
 
-TAGNAME=0.1.8
+TAGNAME=0.2.0
 DOCKER_IMA=menanteau/s4trans:$TAGNAME
 NAME=cmbs4
 hostname="`hostname -s`-$NAME"
