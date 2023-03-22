@@ -18,6 +18,8 @@ RUN git clone https://github.com/CMB-S4/s4trans -b $S4TRANS_VERSION && \
 RUN echo "echo Adding s4trans" >> /opt/spt/setSPTEnv.sh
 RUN echo "source /opt/s4trans/setpath.sh /opt/s4trans" >> /opt/spt/setSPTEnv.sh
 
+COPY --chown=${S4USER}:${S4USER} docker/startup.sh /opt/startup.sh
+RUN chmod a+x /opt/startup.sh
 
 # Add $SPTUSER as user and create groups wheel and spt
 ARG S4USER
@@ -28,4 +30,4 @@ WORKDIR /home/$S4USER
 RUN echo "echo Adding s4trans" >> $HOME/.bashrc
 RUN echo "source /opt/s4trans/setpath.sh /opt/s4trans" >> $HOME/.bashrc
 
-ENTRYPOINT ["/bin/bash", "/opt/spt/setSPTEnv.sh"]
+ENTRYPOINT ["bash","/opt/startup.sh"]
