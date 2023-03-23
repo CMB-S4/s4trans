@@ -669,7 +669,8 @@ def insert_sources(frame, coords, flux, norm=True, sigma=1.5, nsigma=3):
 
         # Now inject the kernel at xo,yo
         LOGGER.info(f"Inserting {dim,dim} kernel at {xo,yo} with flux {flux_cmb}")
-        numpy.asarray(frame)[yo-dim:yo+dim+1, xo-dim:xo+dim+1] = kernel
+        orig_data = numpy.asarray(frame)[yo-dim:yo+dim+1, xo-dim:xo+dim+1]
+        numpy.asarray(frame)[yo-dim:yo+dim+1, xo-dim:xo+dim+1] = orig_data + kernel
 
     return frame
 
