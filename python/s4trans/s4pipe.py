@@ -281,6 +281,11 @@ class S4pipe:
                  bands=[band],  # or just band
                  subtract_coadd=False)
 
+        # We want the unweighted maps
+        pipe.Add(maps.RemoveWeights, zero_nans=True)
+        pipe.Add(remove_units, units=core.G3Units.mJy)
+        # Write as FITS file
+
         if 'FITS' in filetypes:
             # Get the outname
             self.set_outname(file, f"flt_{proj_name}", filetype='FITS')
@@ -688,3 +693,18 @@ def get_obs_id(file):
     obs_id = int(date0 + int.from_bytes(s.encode(), 'little')/1e5)
     LOGGER.info(f"Will add obs_id: {obs_id} to: {file}")
     return obs_id
+
+
+def remove_units(frame, units):
+    "Remove units for g3 frame"
+    if frame.type != core.G3FrameType.Map:
+        return frame
+    t_scale = units if frame['T'].weighted else 1./units
+    w_scale = units * units
+    for k in ['T', 'Q', 'U']:
+        if k in frame:
+            frame[k] = frame.pop(k) * t_scale
+    for k in ['Wunpol', 'Wpol']:
+        if k in frame:
+            frame[k] = frame.pop(k) * w_scale
+    return frame

@@ -1,5 +1,5 @@
 
-from menanteau/spt3g_ingest:ubuntu_0.3.3_4efaaf2f
+from menanteau/spt3g_ingest:ubuntu_0.3.6_6149ab91
 
 user root
 RUN apt-get update --fix-missing
