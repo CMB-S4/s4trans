@@ -121,7 +121,7 @@ class S4pipe:
                               log_format_date=self.config.log_format_date)
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"Logging Started at level:{self.config.loglevel}")
-        self.logger.info(f"Running spt3g_ingest version: {s4trans.__version__}")
+        self.logger.info(f"Running s4trans version: {s4trans.__version__}")
 
     def load_healpix_map(self, filename, frame='T'):
         """Load a healpix map as an array"""
@@ -245,6 +245,10 @@ class S4pipe:
 
     def filter_sim_file(self, file, proj_name, filetypes, band='150GHz'):
         """Filter Simulations using transient filtering method"""
+
+        # Get the obs_id for the file and obs_seq
+        obs_id = get_obs_id(file, self.obs_seq)
+
         t0 = time.time()
         proj = self.proj[proj_name]
         self.load_healpix_map(file)
@@ -252,9 +256,6 @@ class S4pipe:
         self.logger.info(f"Transforming Healpix to G3 frame for projection {proj_name}")
         map3g = maps.healpix_to_flatsky(self.hp_array[file], **proj)
         self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
-
-        # Get the obs_id based on the name of the file
-        obs_id = get_obs_id(file)
 
         # Insert if catalog is present
         if self.sources_coords is not None:
@@ -685,12 +686,25 @@ def addid_to_frame(fr, obs_id):
     fr['ObservationID'] = obs_id
 
 
-def get_obs_id(file):
+def get_obs_id(file, obs_seq):
     """ Common method to get obs_id based on the name of the file"""
     date0 = datetime.datetime(2013, 1, 1, 0, 0).timestamp()
     f = os.path.basename(file)
-    s = ''.join(f.split('_')[3].split('-'))
-    obs_id = int(date0 + int.from_bytes(s.encode(), 'little')/1e5)
+    # Check if RISING or SETTING
+    if f.find('RISING') > 0:
+        scan = 'RISING'
+    elif f.find('SETTING'):
+        scan = 'SETTING'
+    else:
+        LOGGER.error(f"Cannot find RISING/SETTING from file: {f}")
+        sys.exit(1)
+    idx = numpy.where(obs_seq[scan]['filename'] == f)[0][0]
+    if scan == 'RISING':
+        dtime = (2*idx + 1)*60
+    if scan == 'SETTING':
+        dtime = (2*idx + 2)*60
+
+    obs_id = int(date0 + dtime)
     LOGGER.info(f"Will add obs_id: {obs_id} to: {file}")
     return obs_id
 
