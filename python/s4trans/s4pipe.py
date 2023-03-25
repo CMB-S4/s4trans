@@ -282,15 +282,14 @@ class S4pipe:
                  bands=[band],  # or just band
                  subtract_coadd=False)
 
-        # We want the unweighted maps
-        pipe.Add(maps.RemoveWeights, zero_nans=True)
-        pipe.Add(remove_units, units=core.G3Units.mJy)
         # Write as FITS file
-
         if 'FITS' in filetypes:
             # Get the outname
             self.set_outname(file, f"flt_{proj_name}", filetype='FITS')
             self.logger.info(f"Preparing to write FITS: {file}")
+            # We want the unweighted maps
+            pipe.Add(maps.RemoveWeights, zero_nans=True)
+            pipe.Add(remove_units, units=core.G3Units.mJy)
             pipe.Add(maps.fitsio.SaveMapFrame, output_file=self.outname_tmp,
                      compress='GZIP_2', overwrite=True)
         if 'G3' in filetypes:
