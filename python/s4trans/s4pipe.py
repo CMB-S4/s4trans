@@ -54,6 +54,9 @@ class S4pipe:
     def read_source_catalog(self):
         """ Read in the csv file with ra,dec,flux"""
 
+        # Now we read the observation sequence
+        self.obs_seq = s4tools.load_obs_seq()
+
         try:
             self.config.source_catalog
         except AttributeError:
@@ -67,8 +70,6 @@ class S4pipe:
         self.logger.info(f"Reading catalog with sources to insert: {self.config.source_catalog}")
         self.sources_coords = pd.read_csv(self.config.source_catalog, skipinitialspace=True)
 
-        # Now we read the observation sequence
-        self.obs_seq = s4tools.load_obs_seq()
         return
 
     def get_flux_scale(self, filename, obs_key, obs_width, proj_name, scan, nsigma=3):
@@ -135,12 +136,12 @@ class S4pipe:
             self.hp_array[filename] = hp_array[frame]
         return self.hp_array[filename]
 
-    def write_fits(self, frame3g, file, proj_name):
+    def write_fits(self, frame3g, file, proj_name, hdr=None):
         # Get self.outname and self.outname_tmp
         self.set_outname(file, proj_name, filetype='FITS')
         self.logger.info(f"Will create: {self.outname_tmp}")
         t0 = time.time()
-        maps.fitsio.save_skymap_fits(self.outname_tmp, frame3g, overwrite=True)
+        maps.fitsio.save_skymap_fits(self.outname_tmp, frame3g, overwrite=True, hdr=hdr)
         # In case we have indirect_write
         self.move_outname()
         self.logger.info(f"FITS file creation time: {s4tools.elapsed_time(t0)}")
@@ -290,8 +291,10 @@ class S4pipe:
             # We want the unweighted maps
             pipe.Add(maps.RemoveWeights, zero_nans=True)
             pipe.Add(remove_units, units=core.G3Units.mJy)
+            hdr = {}
+            hdr['OBSID'] = (obs_id, 'ObservationID')
             pipe.Add(maps.fitsio.SaveMapFrame, output_file=self.outname_tmp,
-                     compress='GZIP_2', overwrite=True)
+                     compress='GZIP_2', overwrite=True, hdr=hdr)
         if 'G3' in filetypes:
             # Get the outname
             self.set_outname(file, f"flt_{proj_name}", filetype='G3')
@@ -377,12 +380,21 @@ class S4pipe:
             for proj_name in self.config.proj_name:
                 try:
                     on_fraction = self.get_db_onfraction(file, proj_name)
+                    if on_fraction is None:
+                        on_fraction = 0
+                    #    self.logger.warning(f"Will try to calculate fraction for {proj_name}")
+                    #    on_fraction = self.calculate_onfraction(file, proj_name)
                 except Exception:
                     self.logger.warning(f"Cannot find fraction for {file} on DB")
+                    self.logger.warning(f"Will try to calculate fraction for {proj_name}")
                     on_fraction = self.calculate_onfraction(file, proj_name)
 
                 # Project if above threshold
                 if on_fraction > self.config.onfracion_thresh and on_fraction is not None:
+                    self.logger.info(f"Fraction of non-zero pixels above threshold: {on_fraction}")
+                    self.project_sim_file(file, proj_name, filetypes)
+                # Project if above threshold
+                if self.config.onfracion_thresh == 0 and on_fraction == 0:
                     self.logger.info(f"Fraction of non-zero pixels above threshold: {on_fraction}")
                     self.project_sim_file(file, proj_name, filetypes)
                 else:
@@ -399,13 +411,13 @@ class S4pipe:
         proj = self.proj[proj_name]
         self.load_healpix_map(file)
         t1 = time.time()
-        self.logger.info(f"Transforming Healpix to G3 frame for projection {proj_name}")
+        self.logger.info(f"Transforming Healpix to G3 frame for projection: {proj_name}")
         map3g = maps.healpix_to_flatsky(self.hp_array[file], **proj)
         self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
         self.logger.info(f"New Frame:\n {map3g}")
 
-        # Get the obs_id based on the name of the file
-        # obs_id = get_obs_id(file)
+        # Get the obs_id for the file and obs_seq
+        obs_id = get_obs_id(file, self.obs_seq)
 
         # Insert if catalog is present
         if self.sources_coords is not None:
@@ -416,7 +428,9 @@ class S4pipe:
 
         if 'FITS' in filetypes:
             self.logger.info(f"Preparing to write FITS: {file}")
-            self.write_fits(map3g, file, proj_name)
+            hdr = {}
+            hdr['OBSID'] = (obs_id, 'ObservationID')
+            self.write_fits(map3g, file, proj_name, hdr)
         if 'G3' in filetypes:
             self.logger.info(f"Preparing to write G3: {file}")
             self.write_g3(map3g, file, proj_name)
@@ -575,6 +589,20 @@ def define_tiles_projection(x_len=5000, y_len=5000,
         if delta_center <= delta_low:
             delta_done = True
     LOGGER.info(f"Defined {ntiles} tiles")
+    # Adding wide test projection
+    # delta_center = -30.0020833
+    delta_center = -15.0
+    alpha_center = 80.8290376865476
+    proj['wide'] = {'res': res,
+                    'x_len': 18000,
+                    'y_len': 25000,
+                    'weighted': weighted,
+                    'alpha_center': alpha_center,  # 57.5
+                    'delta_center': delta_center*d2r,  # -11
+                    'proj': maps.MapProjection.ProjZEA}
+
+    #print(proj["proj_01-04"])
+    #print(proj["wide"])
     return proj
 
 
@@ -598,6 +626,7 @@ def define_tiles_projection_old(ntiles=6, x_len=14000, y_len=20000,
              'delta_center': delta_center,
              'proj': maps.MapProjection.ProjZEA}
         proj[proj_name] = p
+
     return proj
 
 
@@ -687,7 +716,7 @@ def addid_to_frame(fr, obs_id):
 
 def get_obs_id(file, obs_seq):
     """ Common method to get obs_id based on the name of the file"""
-    date0 = datetime.datetime(2013, 1, 1, 0, 0).timestamp()
+    date0 = datetime.datetime(2023, 1, 1, 0, 0).timestamp()
     f = os.path.basename(file)
     # Check if RISING or SETTING
     if f.find('RISING') > 0:
@@ -705,6 +734,7 @@ def get_obs_id(file, obs_seq):
 
     obs_id = int(date0 + dtime)
     LOGGER.info(f"Will add obs_id: {obs_id} to: {file}")
+    LOGGER.info(f"Date: {datetime.datetime.fromtimestamp(obs_id)}")
     return obs_id
 
 
