@@ -15,6 +15,7 @@ import datetime
 from spt3g.util.maths import gaussian2d
 from astropy.coordinates import SkyCoord
 import pandas as pd
+import healpy as hp
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ class S4pipe:
 
         # Define the self.hp_array dict for later
         self.hp_array = {}
+        self.hp_array_wgt = {}
 
         # Read in catalog
         self.read_source_catalog()
@@ -134,27 +136,34 @@ class S4pipe:
             hp_array = maps.load_skymap_fits(filename)
             LOGGER.info(f"Read time: {s4tools.elapsed_time(t0)}")
             self.hp_array[filename] = hp_array[frame]
-        return self.hp_array[filename]
 
-    def write_fits(self, frame3g, file, proj_name, hdr=None):
+            # Now we read in the weight (incov) file
+            vals = filename.split('.fits')
+            filename_wgt = f"{vals[0]}_invcov.fits{vals[1]}"
+            if os.path.isfile(filename_wgt):
+                self.logger.info(f"Reading INCOV into array file: {filename_wgt}")
+                self.hp_array_wgt[filename] = hp.read_map(filename_wgt, dtype=numpy.float32, verbose=False)
+            else:
+                raise Exception(f"File {filename_wgt} does not exist")
+
+    def write_fits(self, g3frame, file, proj_name, hdr=None):
         # Get self.outname and self.outname_tmp
         self.set_outname(file, proj_name, filetype='FITS')
         self.logger.info(f"Will create: {self.outname_tmp}")
         t0 = time.time()
-        maps.fitsio.save_skymap_fits(self.outname_tmp, frame3g, overwrite=True, hdr=hdr)
+        maps.fitsio.save_skymap_fits(self.outname_tmp,
+                                     g3frame['T'], W=g3frame['Wunpol'],
+                                     compress='GZIP_2', overwrite=True, hdr=hdr)
         # In case we have indirect_write
         self.move_outname()
         self.logger.info(f"FITS file creation time: {s4tools.elapsed_time(t0)}")
 
-    def write_g3(self, frame3g, file, proj_name):
+    def write_g3(self, g3frame, file, proj_name):
         # Get self.outname and self.outname_tmp
         self.set_outname(file, proj_name, filetype='G3')
         self.logger.info(f"Will create: {self.outname_tmp}")
         t0 = time.time()
-        f = core.G3Frame(core.G3FrameType.Map)
-        f['T'] = frame3g
-        f['T'].sparse = False
-        core.G3Writer(filename=self.outname_tmp)(f)
+        core.G3Writer(filename=self.outname_tmp)(g3frame)
         # In case we have indirect_write
         self.move_outname()
         self.logger.info(f"G3 file creation time: {s4tools.elapsed_time(t0)}")
@@ -257,6 +266,12 @@ class S4pipe:
         self.logger.info(f"Transforming Healpix to G3 frame for projection {proj_name}")
         map3g = maps.healpix_to_flatsky(self.hp_array[file], **proj)
         self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
+        self.logger.info(f"New Frame:\n {map3g}")
+
+        t1 = time.time()
+        map3gTT = maps.healpix_to_flatsky(self.hp_array_wgt[file], **proj)
+        self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
+        self.logger.info(f"New Frame:\n {map3gTT}")
 
         # Insert if catalog is present
         if self.sources_coords is not None:
@@ -266,11 +281,19 @@ class S4pipe:
             self.logger.info("Done inserting sources")
 
         # Create a weights maps of ones
-        weights = map3g.clone()
-        idx = numpy.where(weights != 0)
-        numpy.asarray(weights)[idx] = 1
-        weightmap = maps.G3SkyMapWeights()
-        weightmap.TT = weights
+        #weights = map3g.clone()
+        #idx = numpy.where(weights != 0)
+        #numpy.asarray(weights)[idx] = 1
+        #weightmap = maps.G3SkyMapWeights()
+        #weightmap.TT = weights
+
+        # Now we want to put the data/weights in g3/frame format
+        g3frame = core.G3Frame(core.G3FrameType.Map)
+        g3frame['T'] = map3g
+        g3frame['T'].sparse = False
+        weightmap = maps.G3SkyMapWeights(g3frame['T'], polarized=False)
+        weightmap.TT = map3gTT
+        g3frame["Wunpol"] = weightmap
 
         self.logger.info("Loading pipe for filtering")
         pipe = core.G3Pipeline()
@@ -287,7 +310,7 @@ class S4pipe:
         if 'FITS' in filetypes:
             # Get the outname
             self.set_outname(file, f"flt_{proj_name}", filetype='FITS')
-            self.logger.info(f"Preparing to write FITS: {file}")
+            self.logger.info(f"Preparing to write FITS: {self.outname_tmp}")
             # We want the unweighted maps
             pipe.Add(maps.RemoveWeights, zero_nans=True)
             pipe.Add(remove_units, units=core.G3Units.mJy)
@@ -298,7 +321,7 @@ class S4pipe:
         if 'G3' in filetypes:
             # Get the outname
             self.set_outname(file, f"flt_{proj_name}", filetype='G3')
-            self.logger.info(f"Preparing to write G3: {file}")
+            self.logger.info(f"Preparing to write G3: {self.outname_tmp}")
             pipe.Add(core.G3Writer, filename=self.outname_tmp)
 
         self.logger.info("Executing .Run()")
@@ -310,14 +333,15 @@ class S4pipe:
             # Get the outname
             self.set_outname(file, f"flt_{proj_name}", filetype='FITS')
             self.move_outname()
+            self.logger.info(f"Created file: {self.outname}")
 
         if 'G3' in filetypes:
             # Get the outname
             self.set_outname(file, f"flt_{proj_name}", filetype='G3')
             self.move_outname()
+            self.logger.info(f"Created file: {self.outname}")
 
         self.logger.info(f"Filtering file {file} done: {s4tools.elapsed_time(t0)} ")
-        self.logger.info(f"Created file: {self.outname}")
         return
 
     def filter_sims(self, filetypes=['FITS', 'G3']):
@@ -391,14 +415,14 @@ class S4pipe:
 
                 # Project if above threshold
                 if on_fraction > self.config.onfracion_thresh and on_fraction is not None:
-                    self.logger.info(f"Fraction of non-zero pixels above threshold: {on_fraction}")
+                    self.logger.info(f"Fraction of non-zero pixels is ABOVE threshold: {on_fraction}")
                     self.project_sim_file(file, proj_name, filetypes)
                 # Project if above threshold
-                if self.config.onfracion_thresh == 0 and on_fraction == 0:
-                    self.logger.info(f"Fraction of non-zero pixels above threshold: {on_fraction}")
-                    self.project_sim_file(file, proj_name, filetypes)
+                #if self.config.onfracion_thresh == 0 and on_fraction == 0:
+                #    self.logger.info(f"Fraction of non-zero pixels above threshold: {on_fraction}")
+                #    self.project_sim_file(file, proj_name, filetypes)
                 else:
-                    self.logger.info(f"Fraction of non-zero pixels below threshold: {on_fraction}")
+                    self.logger.info(f"Fraction of non-zero pixels is BELOW threshold: {on_fraction}")
                     self.logger.info(f"Skipping FITS for projection: {proj_name}")
 
             self.logger.info(f"Done with {file} time: {s4tools.elapsed_time(t1)} ")
@@ -407,6 +431,10 @@ class S4pipe:
 
     def project_sim_file(self, file, proj_name, filetypes):
         """ Project single sim file"""
+
+        # Get the obs_id for the file and obs_seq
+        obs_id = get_obs_id(file, self.obs_seq)
+
         t0 = time.time()
         proj = self.proj[proj_name]
         self.load_healpix_map(file)
@@ -416,8 +444,10 @@ class S4pipe:
         self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
         self.logger.info(f"New Frame:\n {map3g}")
 
-        # Get the obs_id for the file and obs_seq
-        obs_id = get_obs_id(file, self.obs_seq)
+        t1 = time.time()
+        map3gTT = maps.healpix_to_flatsky(self.hp_array_wgt[file], **proj)
+        self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
+        self.logger.info(f"New Frame:\n {map3gTT}")
 
         # Insert if catalog is present
         if self.sources_coords is not None:
@@ -426,14 +456,22 @@ class S4pipe:
             map3g = insert_sources(map3g, self.sources_coords, flux_scaled, norm=False)
             self.logger.info("Done inserting sources")
 
+        # Now we want to put the data/weights in g3/frame format
+        g3frame = core.G3Frame(core.G3FrameType.Map)
+        g3frame['T'] = map3g
+        g3frame['T'].sparse = False
+        wgt_out = maps.G3SkyMapWeights(g3frame['T'], polarized=False)
+        wgt_out.TT = map3gTT
+        g3frame["Wunpol"] = wgt_out
+
         if 'FITS' in filetypes:
             self.logger.info(f"Preparing to write FITS: {file}")
             hdr = {}
             hdr['OBSID'] = (obs_id, 'ObservationID')
-            self.write_fits(map3g, file, proj_name, hdr)
+            self.write_fits(g3frame, file, proj_name, hdr)
         if 'G3' in filetypes:
             self.logger.info(f"Preparing to write G3: {file}")
-            self.write_g3(map3g, file, proj_name)
+            self.write_g3(g3frame, file, proj_name)
         self.logger.info(f"Projecting of file: {file} done: {s4tools.elapsed_time(t0)} ")
         del map3g
         return
