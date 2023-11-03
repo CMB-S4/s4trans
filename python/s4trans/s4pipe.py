@@ -142,7 +142,8 @@ class S4pipe:
             filename_wgt = f"{vals[0]}_invcov.fits{vals[1]}"
             if os.path.isfile(filename_wgt):
                 self.logger.info(f"Reading INCOV into array file: {filename_wgt}")
-                self.hp_array_wgt[filename] = hp.read_map(filename_wgt, dtype=numpy.float32, verbose=False)
+                incov = hp.read_map(filename_wgt, dtype=numpy.float32, verbose=False)
+                self.hp_array_wgt[filename] = numpy.where(incov == 0, 0, 1/incov**2)
             else:
                 raise Exception(f"File {filename_wgt} does not exist")
 
