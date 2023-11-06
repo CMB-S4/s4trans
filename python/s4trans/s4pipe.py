@@ -143,7 +143,10 @@ class S4pipe:
             if os.path.isfile(filename_wgt):
                 self.logger.info(f"Reading INCOV into array file: {filename_wgt}")
                 incov = hp.read_map(filename_wgt, dtype=numpy.float32, verbose=False)
-                self.hp_array_wgt[filename] = numpy.where(incov == 0, 0, 1/incov**2)
+                # Normalize the weight
+                if self.config.normalize_weight:
+                    incov = incov/numpy.max(incov)
+                self.hp_array_wgt[filename] = numpy.sqrt(incov)
             else:
                 raise Exception(f"File {filename_wgt} does not exist")
 
@@ -281,19 +284,28 @@ class S4pipe:
             map3g = insert_sources(map3g, self.sources_coords, flux_scaled, norm=False)
             self.logger.info("Done inserting sources")
 
-        # Create a weights maps of ones
-        #weights = map3g.clone()
-        #idx = numpy.where(weights != 0)
-        #numpy.asarray(weights)[idx] = 1
-        #weightmap = maps.G3SkyMapWeights()
-        #weightmap.TT = weights
-
-        # Now we want to put the data/weights in g3/frame format
+        # Create frame for output
         g3frame = core.G3Frame(core.G3FrameType.Map)
         g3frame['T'] = map3g
         g3frame['T'].sparse = False
-        weightmap = maps.G3SkyMapWeights(g3frame['T'], polarized=False)
-        weightmap.TT = map3gTT
+
+        # Create a weights maps of ones -- fake weights
+        if self.config.clone_weight:
+            self.logger.info(f"Clonning weights for: {file}")
+            weights_clone = map3g.clone()
+            idx = numpy.where(weights_clone != 0)
+            numpy.asarray(weights_clone)[idx] = 1
+            weightmap = maps.G3SkyMapWeights()
+            weightmap.TT = weights_clone
+        # Now we want to put the data/weights in g3/frame format
+        else:
+            g3frame = core.G3Frame(core.G3FrameType.Map)
+            g3frame['T'] = map3g
+            g3frame['T'].sparse = False
+            weightmap = maps.G3SkyMapWeights(g3frame['T'], polarized=False)
+            weightmap.TT = map3gTT
+
+        # Add to the frame
         g3frame["Wunpol"] = weightmap
 
         self.logger.info("Loading pipe for filtering")
@@ -369,9 +381,16 @@ class S4pipe:
             self.logger.info(f"Doing: {nfile}/{self.config.nfiles} files")
             for proj_name in self.config.proj_name:
                 on_fraction = self.get_db_onfraction(file, proj_name)
+                if on_fraction is None:
+                    on_fraction = 0
+                    self.logger.warning(f"Cannot find fraction for {file} on DB")
+                    self.logger.warning(f"Will try to calculate fraction for {proj_name}")
+                    on_fraction = self.calculate_onfraction(file, proj_name)
                 if on_fraction > self.config.onfracion_thresh and on_fraction is not None:
+                    self.logger.info(f"Fraction of non-zero pixels is ABOVE threshold: {on_fraction}")
                     self.filter_sim_file(file, proj_name, filetypes)
                 else:
+                    self.logger.info(f"Fraction of non-zero pixels is BELOW threshold: {on_fraction}")
                     self.logger.info(f"Skipping proj:{proj_name} for file: {file}")
 
             nfile += 1
@@ -403,25 +422,16 @@ class S4pipe:
 
             t1 = time.time()
             for proj_name in self.config.proj_name:
-                try:
-                    on_fraction = self.get_db_onfraction(file, proj_name)
-                    if on_fraction is None:
-                        on_fraction = 0
-                    #    self.logger.warning(f"Will try to calculate fraction for {proj_name}")
-                    #    on_fraction = self.calculate_onfraction(file, proj_name)
-                except Exception:
+                on_fraction = self.get_db_onfraction(file, proj_name)
+                if on_fraction is None:
+                    on_fraction = 0
                     self.logger.warning(f"Cannot find fraction for {file} on DB")
                     self.logger.warning(f"Will try to calculate fraction for {proj_name}")
                     on_fraction = self.calculate_onfraction(file, proj_name)
-
                 # Project if above threshold
                 if on_fraction > self.config.onfracion_thresh and on_fraction is not None:
                     self.logger.info(f"Fraction of non-zero pixels is ABOVE threshold: {on_fraction}")
                     self.project_sim_file(file, proj_name, filetypes)
-                # Project if above threshold
-                #if self.config.onfracion_thresh == 0 and on_fraction == 0:
-                #    self.logger.info(f"Fraction of non-zero pixels above threshold: {on_fraction}")
-                #    self.project_sim_file(file, proj_name, filetypes)
                 else:
                     self.logger.info(f"Fraction of non-zero pixels is BELOW threshold: {on_fraction}")
                     self.logger.info(f"Skipping FITS for projection: {proj_name}")
@@ -457,13 +467,26 @@ class S4pipe:
             map3g = insert_sources(map3g, self.sources_coords, flux_scaled, norm=False)
             self.logger.info("Done inserting sources")
 
-        # Now we want to put the data/weights in g3/frame format
+        # Create frame for output
         g3frame = core.G3Frame(core.G3FrameType.Map)
         g3frame['T'] = map3g
         g3frame['T'].sparse = False
-        wgt_out = maps.G3SkyMapWeights(g3frame['T'], polarized=False)
-        wgt_out.TT = map3gTT
-        g3frame["Wunpol"] = wgt_out
+
+        # Create a weights maps of ones -- fake weights
+        if self.config.clone_weight:
+            self.logger.info(f"Clonning weights for: {file}")
+            weights_clone = map3g.clone()
+            idx = numpy.where(weights_clone != 0)
+            numpy.asarray(weights_clone)[idx] = 1
+            weightmap = maps.G3SkyMapWeights()
+            weightmap.TT = weights_clone
+        # Now we want to put the data/weights in g3/frame format
+        else:
+            weightmap = maps.G3SkyMapWeights(g3frame['T'], polarized=False)
+            weightmap.TT = map3gTT
+
+        # Add to the frame
+        g3frame["Wunpol"] = weightmap
 
         if 'FITS' in filetypes:
             self.logger.info(f"Preparing to write FITS: {file}")
@@ -630,18 +653,36 @@ def define_tiles_projection(x_len=5000, y_len=5000,
     LOGGER.info(f"Defined {ntiles} tiles")
     # Adding wide test projection
     # delta_center = -30.0020833
+    proj_name = 'wide'
     delta_center = -15.0
     alpha_center = 80.8290376865476
-    proj['wide'] = {'res': res,
-                    'x_len': 18000,
-                    'y_len': 25000,
-                    'weighted': weighted,
-                    'alpha_center': alpha_center,  # 57.5
-                    'delta_center': delta_center*d2r,  # -11
-                    'proj': maps.MapProjection.ProjZEA}
+    proj[proj_name] = {'res': res,
+                       'x_len': 18000,
+                       'y_len': 25000,
+                       'weighted': weighted,
+                       'alpha_center': alpha_center,  # 57.5
+                       'delta_center': delta_center*d2r,  # -11
+                       'proj': maps.MapProjection.ProjZEA}
+    msg = f"Defining (alpha, delta) center for {proj_name} at {alpha_center:.1f},{delta_center} deg"
 
-    #print(proj["proj_01-04"])
-    #print(proj["wide"])
+    # We also a add a small patch for testing
+    proj_name = 'small'
+    delta_center = -30.0
+    alpha_center = 80.8290376865476
+    proj[proj_name] = {'res': res,
+                       'x_len': 1000,
+                       'y_len': 1000,
+                       'weighted': weighted,
+                       'alpha_center': alpha_center,  # 57.5
+                       'delta_center': delta_center*d2r,  # -11
+                       'proj': maps.MapProjection.ProjZEA}
+
+    msg = f"Defining (alpha, delta) center for {proj_name} at {alpha_center:.1f},{delta_center} deg"
+    LOGGER.info(msg)
+
+    # print(proj["proj_01-04"])
+    # print(proj["small"])
+
     return proj
 
 

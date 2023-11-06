@@ -39,6 +39,13 @@ def cmdline():
     parser.add_argument("--source_catalog", action='store', type=str, default=None,
                         help='Coma-separated catalog with RA,DEC,FLUX to insert into frames')
 
+    # Clone weights_clone
+    parser.add_argument("--clone_weight", action='store_true', default=False,
+                        help='Add cloned weights of zeroes and ones')
+    # Normalize weights
+    parser.add_argument("--normalize_weight", action='store_true', default=False,
+                        help='Normalize weights')
+
     # Logging options (loglevel/log_format/log_format_date)
     default_log_format = '[%(asctime)s.%(msecs)03d][%(levelname)s][%(name)s][%(funcName)s] %(message)s'
     default_log_format_date = '%Y-%m-%d %H:%M:%S'

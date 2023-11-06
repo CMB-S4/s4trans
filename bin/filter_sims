@@ -31,6 +31,10 @@ def cmdline():
     parser.add_argument("--source_catalog", action='store', type=str, default=None,
                         help='Coma-separated catalog with RA,DEC,FLUX to insert into frames')
 
+    # Clone weights_clone
+    parser.add_argument("--clone_weight", action='store_true', default=False,
+                        help='Add cloned weights of zeroes and ones')
+
     # Write options
     parser.add_argument("--indirect_write", action='store_true', default=False,
                         help="Use indirect write of files to /tmp before moving to destionation.")
