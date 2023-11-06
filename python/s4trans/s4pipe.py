@@ -254,6 +254,11 @@ class S4pipe:
 
             self.logger.info(f"Done with {file} time: {s4tools.elapsed_time(t1)} ")
             nfile += 1
+
+            # Clean up
+            del frame3g
+            del self.hp_array[file]
+
         ofile.close()
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
@@ -364,6 +369,11 @@ class S4pipe:
             self.logger.info(f"Created file: {self.outname}")
 
         self.logger.info(f"Filtering file {file} done: {s4tools.elapsed_time(t0)} ")
+
+        del map3g
+        del map3gTT
+        self.clean_up(file)
+
         return
 
     def filter_sims(self, filetypes=['FITS', 'G3']):
@@ -508,8 +518,16 @@ class S4pipe:
             self.logger.info(f"Preparing to write G3: {file}")
             self.write_g3(g3frame, file, proj_name)
         self.logger.info(f"Projecting of file: {file} done: {s4tools.elapsed_time(t0)} ")
+
         del map3g
+        del map3gTT
+        self.clean_up(file)
+
         return
+
+    def clean_up(self, file):
+        del self.hp_array[file]
+        del self.hp_array_wgt[file]
 
     def ingest_onfraction(self):
         """Ingest the on fraction log files into the sqlite3 database"""
@@ -541,6 +559,7 @@ class S4pipe:
         # query = query + f' and fraction>{self.config.onfracion_thresh}'
         self.logger.info(f"Will run query:\n\t{query}")
         rec = s4tools.query2rec(query, self.dbhandle)
+        print(rec)
         return rec
 
     def get_db_onfraction(self, filename, proj_name, verb=True):
