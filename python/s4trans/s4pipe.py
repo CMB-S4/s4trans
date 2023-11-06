@@ -137,6 +137,7 @@ class S4pipe:
             LOGGER.info(f"Read time: {s4tools.elapsed_time(t0)}")
             self.hp_array[filename] = hp_array[frame]
 
+            # Stop here if no weights is True
             if noweight:
                 return
 
@@ -148,6 +149,7 @@ class S4pipe:
                 incov = hp.read_map(filename_wgt, dtype=numpy.float32, verbose=False)
                 # Normalize the weight
                 if self.config.normalize_weight:
+                    self.logger.info("Normalizing INCOV array")
                     incov = incov/numpy.max(incov)
                 self.hp_array_wgt[filename] = numpy.sqrt(incov)
             else:
@@ -536,12 +538,16 @@ class S4pipe:
         # Make the connection to the DB
         con = s4tools.connect_db(self.config.dbname, self.config.tablename)
 
+        # Check if we want to replace entry
+        replace_insert = self.config.replace_insert
+
         # Loop over all of the files
         nfile = 1
         for filename in self.config.files:
             t1 = time.time()
             self.logger.info(f"Doing: {nfile}/{self.config.nfiles} files")
-            s4tools.ingest_fraction_file(filename, self.config.tablename, con=con)
+            s4tools.ingest_fraction_file(filename, self.config.tablename,
+                                         con=con, replace=replace_insert)
             self.logger.info(f"Done with {filename} time: {s4tools.elapsed_time(t1)} ")
             nfile += 1
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
@@ -559,7 +565,6 @@ class S4pipe:
         # query = query + f' and fraction>{self.config.onfracion_thresh}'
         self.logger.info(f"Will run query:\n\t{query}")
         rec = s4tools.query2rec(query, self.dbhandle)
-        print(rec)
         return rec
 
     def get_db_onfraction(self, filename, proj_name, verb=True):
@@ -601,10 +606,10 @@ class S4pipe:
         # Select only files above fraction threshold
         try:
             rec = self.rec_onfractions
-            self.logger.info(f"On fractions computed for: {self.config.onfracion_thresh} -- skipping")
+            self.logger.info(f"On fractions computed for thresh: {self.config.onfracion_thresh} -- skipping")
         except Exception:
             self.rec_onfractions = self.get_db_onfractions(proj_name)
-            self.logger.info(f"Computing on fraction for: {self.config.onfracion_thresh}")
+            self.logger.info(f"Computing on fraction for thresh: {self.config.onfracion_thresh}")
             rec = self.rec_onfractions
 
         # Now we match using the observing sequence order and select
