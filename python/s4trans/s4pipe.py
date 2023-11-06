@@ -126,7 +126,7 @@ class S4pipe:
         self.logger.info(f"Logging Started at level:{self.config.loglevel}")
         self.logger.info(f"Running s4trans version: {s4trans.__version__}")
 
-    def load_healpix_map(self, filename, frame='T'):
+    def load_healpix_map(self, filename, noweight=False, frame='T'):
         """Load a healpix map as an array"""
         t0 = time.time()
         if filename in self.hp_array:
@@ -136,6 +136,9 @@ class S4pipe:
             hp_array = maps.load_skymap_fits(filename)
             LOGGER.info(f"Read time: {s4tools.elapsed_time(t0)}")
             self.hp_array[filename] = hp_array[frame]
+
+            if noweight:
+                return
 
             # Now we read in the weight (incov) file
             vals = filename.split('.fits')
@@ -225,14 +228,20 @@ class S4pipe:
             self.logger.info(f"Doing: {nfile}/{self.config.nfiles} files")
             # Load up the gzip healpix map
             t1 = time.time()
-            self.load_healpix_map(file)
+            self.load_healpix_map(file, noweight=True)
             # Get the name of the output file to record the fractions
             self.set_outname_frac(file)
             ofile = open(self.outname_frac, 'w')
 
-            k = 1
-            for proj_name, proj in self.proj.items():
+            if self.config.proj_name is not None:
+                proj_names = self.config.proj_name
+            else:
+                proj_names = self.proj_names
 
+            k = 1
+            for proj_name in proj_names:
+
+                proj = self.proj[proj_name]
                 self.logger.info(f"Transforming Healpix to G3 frame for projection: {proj_name}")
                 t2 = time.time()
                 frame3g = maps.healpix_to_flatsky(self.hp_array[file], **proj)
@@ -384,8 +393,9 @@ class S4pipe:
                 if on_fraction is None:
                     on_fraction = 0
                     self.logger.warning(f"Cannot find fraction for {file} on DB")
-                    self.logger.warning(f"Will try to calculate fraction for {proj_name}")
+                    self.logger.warning(f"Will try to calculate fraction for: {proj_name}")
                     on_fraction = self.calculate_onfraction(file, proj_name)
+                    self.logger.info(f"Computed fraction: {on_fraction}")
                 if on_fraction > self.config.onfracion_thresh and on_fraction is not None:
                     self.logger.info(f"Fraction of non-zero pixels is ABOVE threshold: {on_fraction}")
                     self.filter_sim_file(file, proj_name, filetypes)
@@ -426,8 +436,9 @@ class S4pipe:
                 if on_fraction is None:
                     on_fraction = 0
                     self.logger.warning(f"Cannot find fraction for {file} on DB")
-                    self.logger.warning(f"Will try to calculate fraction for {proj_name}")
+                    self.logger.warning(f"Will try to calculate fraction for: {proj_name}")
                     on_fraction = self.calculate_onfraction(file, proj_name)
+                    self.logger.info(f"Computed fraction: {on_fraction}")
                 # Project if above threshold
                 if on_fraction > self.config.onfracion_thresh and on_fraction is not None:
                     self.logger.info(f"Fraction of non-zero pixels is ABOVE threshold: {on_fraction}")

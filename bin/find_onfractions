@@ -12,6 +12,9 @@ def cmdline():
                         help="Filename(s) to preocess")
     parser.add_argument("--outdir", type=str, action='store', default=None,
                         required=True, help="Location for output files")
+    parser.add_argument("--proj_name", nargs='+', action='store', default=None, required=True,
+                        help="Projection to use")
+
     # Logging options (loglevel/log_format/log_format_date)
     default_log_format = '[%(asctime)s.%(msecs)03d][%(levelname)s][%(name)s][%(funcName)s] %(message)s'
     default_log_format_date = '%Y-%m-%d %H:%M:%S'

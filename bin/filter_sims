@@ -15,7 +15,7 @@ def cmdline():
                         required=True, help="Location for output files")
 
     # DB options
-    dbname = os.path.join(os.environ['HOME'], "db/s4sims_DC1.db")
+    dbname = os.path.join(os.environ['HOME'], "db/s4sims_DC0.db")
     parser.add_argument("--dbname", type=str, action='store', default=dbname,
                         help="Database (file) to connect")
     parser.add_argument("--tablename", type=str, action='store', default='on_fraction_DC1',
@@ -34,6 +34,9 @@ def cmdline():
     # Clone weights_clone
     parser.add_argument("--clone_weight", action='store_true', default=False,
                         help='Add cloned weights of zeroes and ones')
+    # Normalize weights
+    parser.add_argument("--normalize_weight", action='store_true', default=False,
+                        help='Normalize weights')
 
     # Write options
     parser.add_argument("--indirect_write", action='store_true', default=False,
