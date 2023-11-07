@@ -15,10 +15,10 @@ def cmdline():
                         required=True, help="Location for output files")
 
     # DB options
-    dbname = os.path.join(os.environ['HOME'], "db/s4sims_DC1.db")
+    dbname = os.path.join(os.environ['HOME'], "db/s4sims_DC0.db")
     parser.add_argument("--dbname", type=str, action='store', default=dbname,
                         help="Database (file) to connect")
-    parser.add_argument("--tablename", type=str, action='store', default='on_fraction_DC1',
+    parser.add_argument("--tablename", type=str, action='store', default='on_fraction_DC0',
                         help="Name of table with file informatiom")
 
     # Fraction threshold

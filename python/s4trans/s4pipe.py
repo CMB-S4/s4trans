@@ -232,6 +232,11 @@ class S4pipe:
 
             self.logger.info(f"Done with {file} time: {s4tools.elapsed_time(t1)} ")
             nfile += 1
+
+            # Clean up
+            del frame3g
+            del self.hp_array[file]
+
         ofile.close()
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
@@ -304,6 +309,9 @@ class S4pipe:
         self.logger.info("Executing .Run()")
         pipe.Run()
         del pipe
+        del map3g
+        del weightmap
+        del self.hp_array[file]
 
         # In case we have indirect_write
         if 'FITS' in filetypes:
@@ -436,6 +444,7 @@ class S4pipe:
             self.write_g3(map3g, file, proj_name)
         self.logger.info(f"Projecting of file: {file} done: {s4tools.elapsed_time(t0)} ")
         del map3g
+        del self.hp_array[file]
         return
 
     def ingest_onfraction(self):
@@ -591,18 +600,36 @@ def define_tiles_projection(x_len=5000, y_len=5000,
     LOGGER.info(f"Defined {ntiles} tiles")
     # Adding wide test projection
     # delta_center = -30.0020833
+    proj_name = 'wide'
     delta_center = -15.0
     alpha_center = 80.8290376865476
-    proj['wide'] = {'res': res,
-                    'x_len': 18000,
-                    'y_len': 25000,
-                    'weighted': weighted,
-                    'alpha_center': alpha_center,  # 57.5
-                    'delta_center': delta_center*d2r,  # -11
-                    'proj': maps.MapProjection.ProjZEA}
+    proj[proj_name] = {'res': res,
+                       'x_len': 18000,
+                       'y_len': 25000,
+                       'weighted': weighted,
+                       'alpha_center': alpha_center,  # 57.5
+                       'delta_center': delta_center*d2r,  # -11
+                       'proj': maps.MapProjection.ProjZEA}
+    msg = f"Defining (alpha, delta) center for {proj_name} at {alpha_center:.1f},{delta_center} deg"
+    LOGGER.info(msg)
 
-    #print(proj["proj_01-04"])
-    #print(proj["wide"])
+    # print(proj["proj_01-04"])
+    # print(proj["wide"])
+
+    # We also a add a small patch for testing
+    proj_name = 'small'
+    delta_center = -30.0
+    alpha_center = 80.8290376865476
+    proj[proj_name] = {'res': res,
+                       'x_len': 1000,
+                       'y_len': 1000,
+                       'weighted': weighted,
+                       'alpha_center': alpha_center,  # 57.5
+                       'delta_center': delta_center*d2r,  # -11
+                       'proj': maps.MapProjection.ProjZEA}
+
+    msg = f"Defining (alpha, delta) center for {proj_name} at {alpha_center:.1f},{delta_center} deg"
+    LOGGER.info(msg)
     return proj
 
 
