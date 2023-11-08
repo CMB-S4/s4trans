@@ -400,6 +400,7 @@ class S4pipe:
 
         nfile = 1
         for file in self.config.files:
+            t1 = time.time()
             self.logger.info(f"Doing: {nfile}/{self.config.nfiles} files")
             for proj_name in self.config.proj_name:
                 on_fraction = self.get_db_onfraction(file, proj_name)
@@ -416,6 +417,7 @@ class S4pipe:
                     self.logger.info(f"Fraction of non-zero pixels is BELOW threshold: {on_fraction}")
                     self.logger.info(f"Skipping proj:{proj_name} for file: {file}")
 
+            self.logger.info(f"Done with {file} time: {s4tools.elapsed_time(t1)} ")
             nfile += 1
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
         return
