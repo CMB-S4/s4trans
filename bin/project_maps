@@ -27,6 +27,16 @@ def cmdline():
     parser.add_argument("--proj_name", nargs='+', action='store', default=None, required=True,
                         help="Projection to use")
 
+    # Inject/Insert sources
+    parser.add_argument("--source_catalog", action='store', type=str, default=None,
+                        help='Coma-separated catalog with RA,DEC,FLUX to insert into frames')
+
+    # Clone weights_clone and Normalize weights
+    parser.add_argument("--clone_weight", action='store_true', default=False,
+                        help='Add cloned weights of zeroes and ones')
+    parser.add_argument("--normalize_weight", action='store_true', default=False,
+                        help='Normalize weights')
+
     # Write options
     parser.add_argument("--indirect_write", action='store_true', default=False,
                         help="Use indirect write of files to /tmp before moving to destionation.")
@@ -34,17 +44,6 @@ def cmdline():
                         help="Path for indirect write.")
     parser.add_argument("--output_filetypes", nargs='+', default=['FITS'],
                         help="Output filetype [G3, FITS]")
-
-    # Inject/Insert sources
-    parser.add_argument("--source_catalog", action='store', type=str, default=None,
-                        help='Coma-separated catalog with RA,DEC,FLUX to insert into frames')
-
-    # Clone weights_clone
-    parser.add_argument("--clone_weight", action='store_true', default=False,
-                        help='Add cloned weights of zeroes and ones')
-    # Normalize weights
-    parser.add_argument("--normalize_weight", action='store_true', default=False,
-                        help='Normalize weights')
 
     # Logging options (loglevel/log_format/log_format_date)
     default_log_format = '[%(asctime)s.%(msecs)03d][%(levelname)s][%(name)s][%(funcName)s] %(message)s'

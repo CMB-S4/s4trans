@@ -335,6 +335,12 @@ class S4pipe:
                  bands=[band],  # or just band
                  subtract_coadd=False)
 
+        if 'G3' in filetypes:
+            # Get the outname
+            self.set_outname(file, f"flt_{proj_name}", filetype='G3')
+            self.logger.info(f"Preparing to write G3: {self.outname_tmp}")
+            pipe.Add(core.G3Writer, filename=self.outname_tmp)
+
         # Write as FITS file
         if 'FITS' in filetypes:
             # Get the outname
@@ -347,14 +353,9 @@ class S4pipe:
             hdr['OBSID'] = (obs_id, 'ObservationID')
             pipe.Add(maps.fitsio.SaveMapFrame, output_file=self.outname_tmp,
                      compress='GZIP_2', overwrite=True, hdr=hdr)
-        if 'G3' in filetypes:
-            # Get the outname
-            self.set_outname(file, f"flt_{proj_name}", filetype='G3')
-            self.logger.info(f"Preparing to write G3: {self.outname_tmp}")
-            pipe.Add(core.G3Writer, filename=self.outname_tmp)
 
         self.logger.info("Executing .Run()")
-        pipe.Run()
+        pipe.Run(profile=True)
         del pipe
 
         # In case we have indirect_write
