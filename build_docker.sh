@@ -1,7 +1,7 @@
 
 
 # Build container
-export S4TRANS_VERSION=0.3.1
+export S4TRANS_VERSION=0.3.2
 export S4USER=$USER
 export IMAGE=s4trans
 export TAG=${S4TRANS_VERSION}
