@@ -72,7 +72,7 @@ Run the light curve detections. From the file `source_catalog_small_200mJy.cat `
 limit=200mJy
 SIMS_DIR=filter_sims_DC0_${limit}
 proj=small
-python3 ./lightcurves_s4.py \
+lightcurves_s4.py \
   ${SIMS_DIR}/mapmaker_RISING_SCAN_40-150-10_noiseweighted_map_nside4096_flt_${proj}.g3.gz \
   ${SIMS_DIR}/mapmaker_RISING_SCAN_40-152-10_noiseweighted_map_nside4096_flt_${proj}.g3.gz \
   ${SIMS_DIR}/mapmaker_RISING_SCAN_40-154-10_noiseweighted_map_nside4096_flt_${proj}.g3.gz \
@@ -93,3 +93,4 @@ python3 ./lightcurves_s4.py \
 
 The output of this call is `s4-DC0-200mJy.g3`, which can be use to find/plot the objects detected.
 
+The above call will run using `menanteau/s4trans:0.3.1` 
