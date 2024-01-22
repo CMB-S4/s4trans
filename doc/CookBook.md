@@ -59,6 +59,37 @@ cmd_call: >
 For testing it is important to change `--outdir` to the right directory. <br>
 Additionaly for diferent projections change`--proj_name` accordingly to either: `small` or `proj_01-04`. <br>
 For `--proj_name small` we need to use: ` --source_catalog /projects/caps/cmbs4/etc/source_catalog_small_200mJy.cat` <br>
-For `--proj_name proj_01-04` we need to use: `--source_catalog /projects/caps/cmbs4/etc/source_catalog_200mJy.cat`
-The above examples are for 200mJy 
+For `--proj_name proj_01-04` we need to use: `--source_catalog /projects/caps/cmbs4/etc/source_catalog_200mJy.cat` <br>
+The above examples are for 200mJy<br>
+Also the above example uses singularity image `s4trans-0.3.1.sif` derived from docker image `menanteau/s4trans:0.3.1` 
+
+
+
+#### Step 2
+Run the light curve detections. From the file `source_catalog_small_200mJy.cat ` we know that center or peak of the flux is centered in observation: `40-161-9`. Therefore we run the detection for a range +5,-5 observations (sims) around  observation `40-161-9.`
+
+```
+limit=200mJy
+SIMS_DIR=filter_sims_DC0_${limit}
+proj=small
+python3 ./lightcurves_s4.py \
+  ${SIMS_DIR}/mapmaker_RISING_SCAN_40-150-10_noiseweighted_map_nside4096_flt_${proj}.g3.gz \
+  ${SIMS_DIR}/mapmaker_RISING_SCAN_40-152-10_noiseweighted_map_nside4096_flt_${proj}.g3.gz \
+  ${SIMS_DIR}/mapmaker_RISING_SCAN_40-154-10_noiseweighted_map_nside4096_flt_${proj}.g3.gz \
+  ${SIMS_DIR}/mapmaker_RISING_SCAN_40-155-9_noiseweighted_map_nside4096_flt_${proj}.g3.gz  \
+  ${SIMS_DIR}/mapmaker_RISING_SCAN_40-160-9_noiseweighted_map_nside4096_flt_${proj}.g3.gz  \
+  ${SIMS_DIR}/mapmaker_RISING_SCAN_40-161-9_noiseweighted_map_nside4096_flt_${proj}.g3.gz  \
+  ${SIMS_DIR}/mapmaker_RISING_SCAN_40-163-9_noiseweighted_map_nside4096_flt_${proj}.g3.gz  \
+  ${SIMS_DIR}/mapmaker_RISING_SCAN_40-165-8_noiseweighted_map_nside4096_flt_${proj}.g3.gz  \
+  ${SIMS_DIR}/mapmaker_RISING_SCAN_40-166-9_noiseweighted_map_nside4096_flt_${proj}.g3.gz  \
+  ${SIMS_DIR}/mapmaker_RISING_SCAN_40-168-8_noiseweighted_map_nside4096_flt_${proj}.g3.gz  \
+  ${SIMS_DIR}/mapmaker_RISING_SCAN_40-174-8_noiseweighted_map_nside4096_flt_${proj}.g3.gz  \
+        -o s4-DC0-${limit}.g3 \
+        -v --no-noise-cut \
+        --sn-threshold 8 \
+        --ts-min 100 \
+        --fit-bands 150GHz
+```
+
+The output of this call is `s4-DC0-200mJy.g3`, which can be use to find/plot the objects detected.
 
