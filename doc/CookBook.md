@@ -57,16 +57,16 @@ cmd_call: >
    --normalize_weight
 ```
 For testing it is important to change `--outdir` to the right directory. <br>
-Additionaly for diferent projections change`--proj_name` accordingly to either: `small` or `proj_01-04`. <br>
+Additionally for different projections change`--proj_name` accordingly to either: `small` or `proj_01-04`. <br>
 For `--proj_name small` we need to use: ` --source_catalog /projects/caps/cmbs4/etc/source_catalog_small_200mJy.cat` <br>
 For `--proj_name proj_01-04` we need to use: `--source_catalog /projects/caps/cmbs4/etc/source_catalog_200mJy.cat` <br>
 The above examples are for 200mJy<br>
-Also the above example uses singularity image `s4trans-0.3.1.sif` derived from docker image `menanteau/s4trans:0.3.1` 
+Also the above example uses singularity image `s4trans-0.3.1.sif` derived from docker image `menanteau/s4trans:0.3.1`. The newer image `menanteau/s4trans:0.3.2` 
 
 
 
 #### Step 2
-Run the light curve detections. From the file `source_catalog_small_200mJy.cat ` we know that center or peak of the flux is centered in observation: `40-161-9`. Therefore we run the detection for a range +5,-5 observations (sims) around  observation `40-161-9.`
+Run the light curve detections. From the file `source_catalog_small_200mJy.cat ` we know that the center or peak of the flux is centered in observation: `40-161-9`. Therefore we run the detection for a range of +5,-5 observations (sims) around  observation `40-161-9.`
 
 ```
 limit=200mJy
@@ -91,6 +91,6 @@ lightcurves_s4.py \
         --fit-bands 150GHz
 ```
 
-The output of this call is `s4-DC0-200mJy.g3`, which can be use to find/plot the objects detected.
+The output of this call is `s4-DC0-200mJy.g3`, which can be used to find/plot the objects detected.
 
 The above call will run using `menanteau/s4trans:0.3.1` 
