@@ -93,4 +93,4 @@ lightcurves_s4.py \
 
 The output of this call is `s4-DC0-200mJy.g3`, which can be used to find/plot the objects detected.
 
-The above call will run using `menanteau/s4trans:0.3.1` 
+The above call will run using `menanteau/s4trans:0.3.2` 
