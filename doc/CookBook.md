@@ -63,7 +63,12 @@ For `--proj_name proj_01-04` we need to use: `--source_catalog /projects/caps/cm
 The above examples are for 200mJy<br>
 Also the above example uses singularity image `s4trans-0.3.1.sif` derived from docker image `menanteau/s4trans:0.3.1`. The newer image `menanteau/s4trans:0.3.2` 
 
-
+Note: to select the input files that have good coverage over a "patch" or projection can be done by querying the sqlite database.<br>
+For example, to select all files with on_fraction > 0.9 (i.e. 90%) for projection name `proj_01-04`:
+```
+%> sqlite3 /projects/caps/cmbs4/dlib/s4sims_DC0.db 
+select SIMID, fraction from on_fraction_DC0  where proj='proj_01-04' and fraction>0.9;
+```
 
 #### Step 2
 Run the light curve detections. From the file `source_catalog_small_200mJy.cat ` we know that the center or peak of the flux is centered in observation: `40-161-9`. Therefore we run the detection for a range of +5,-5 observations (sims) around  observation `40-161-9.`
