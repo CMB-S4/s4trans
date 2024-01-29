@@ -74,6 +74,10 @@ Note2: To select the files that we want to insert sources to: <br>
 ```
 get_files_to_insert 40-161-9 --obs_width 15 --dbname /opt/s4trans/etc/s4sims_DC0.db --proj_name "proj_01-04"
 ```
+We can also get the flux scaling adding `--get_scale`:<br>
+```
+get_files_to_insert 40-161-9 --obs_width 15 --proj_name proj_01-04  --get_scale
+```
 
 #### Step 2
 Run the light curve detections. From the file `source_catalog_small_200mJy.cat ` we know that the center or peak of the flux is centered in observation: `40-161-9`. Therefore we run the detection for a range of +5,-5 observations (sims) around  observation `40-161-9.`
