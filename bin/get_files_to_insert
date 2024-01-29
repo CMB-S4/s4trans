@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from s4trans import s4pipe
+from s4trans import s4tools
 import argparse
 import time
 import os
@@ -18,7 +19,7 @@ def cmdline():
                         help="Scan type [RISING/SETTING]")
 
     # DB options
-    dbname = os.path.join(os.environ['HOME'], "db/s4sims_DC1.db")
+    dbname = os.path.join(s4tools.S4TRANS_DIR, "etc/s4sims_DC0.db")
     parser.add_argument("--dbname", type=str, action='store', default=dbname,
                         help="Database (file) to connect")
     parser.add_argument("--tablename", type=str, action='store', default='on_fraction_DC0',
@@ -29,6 +30,8 @@ def cmdline():
                         help="On Fraction threshold")
     parser.add_argument("--proj_name", action='store', type=str, default=None,
                         help="Projection to use")
+    parser.add_argument("--get_scale", action='store_true', default=False,
+                        help="Get flux scale per file")
 
     # Logging options (loglevel/log_format/log_format_date)
     default_log_format = '[%(asctime)s.%(msecs)03d][%(levelname)s][%(name)s][%(funcName)s] %(message)s'
@@ -64,4 +67,12 @@ if __name__ == "__main__":
     print(f"Will write files to: {args.output}")
     with open(args.output, 'w') as f:
         for file in files:
-            f.write(f"{file}\n")
+            # Now we get the fluxes:
+            if args.get_scale:
+                scale = p.get_flux_scale(file, args.obs_key, args.obs_width, args.proj_name,
+                                         scan=args.scan, nsigma=3)
+                f.write(f"{file} {scale}\n")
+            else:
+                f.write(f"{file}\n")
+
+    print(f"Wrote files to: {args.output}")
