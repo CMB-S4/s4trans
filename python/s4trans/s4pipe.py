@@ -718,8 +718,48 @@ def define_tiles_projection(x_len=5000, y_len=5000,
     msg = f"Defining (alpha, delta) center for {proj_name} at {alpha_center:.1f},{delta_center} deg"
     LOGGER.info(msg)
 
-    # print(proj["proj_01-04"])
-    # print(proj["small"])
+    LOGGER.info("Adding defintions for SPLAT regions")
+
+    # Adding definitions for SPLAT regions
+    proj['spwide'] = {'res': 10*7.27220521664304e-05,
+                      'x_len': 2000,
+                      'y_len': 2000,
+                      'weighted': False,
+                      'alpha_center': +0.645772,  # 37
+                      'delta_center': -1.179843,  # -67.6
+                      'proj': maps.MapProjection.ProjZEA}
+
+    proj['sp0'] = {'res': 7.27220521664304e-05,
+                   'x_len': 2400,
+                   'y_len': 2400,
+                   'weighted': False,
+                   'alpha_center': +0.645772,  # 37
+                   'delta_center': -0.890118,  # -51
+                   'proj': maps.MapProjection.ProjZEA}
+
+    proj['sp1'] = {'res': 7.27220521664304e-05,
+                   'x_len': 2400,
+                   'y_len': 2400,
+                   'weighted': False,
+                   'alpha_center': +0.645772,  # 37
+                   'delta_center': -1.01229,  # -58
+                   'proj': maps.MapProjection.ProjZEA}
+
+    proj['sp2'] = {'res': 7.27220521664304e-05,
+                   'x_len': 2400,
+                   'y_len': 2400,
+                   'weighted': False,
+                   'alpha_center': +0.645772,  # 37
+                   'delta_center': -1.0821,  # -62
+                   'proj': maps.MapProjection.ProjZEA}
+
+    proj['sp3'] = {'res': 7.27220521664304e-05,
+                   'x_len': 1920,
+                   'y_len': 1920,
+                   'weighted': False,
+                   'alpha_center': +0.645772,  # 37
+                   'delta_center': -1.160644,  # -66.5
+                   'proj': maps.MapProjection.ProjZEA}
 
     return proj
 
@@ -836,19 +876,23 @@ def get_obs_id(file, obs_seq):
     """ Common method to get obs_id based on the name of the file"""
     date0 = datetime.datetime(2023, 1, 1, 0, 0).timestamp()
     f = os.path.basename(file)
-    # Check if RISING or SETTING
+    # Check if RISING, SETTING or POLE
     if f.find('RISING') > 0:
         scan = 'RISING'
-    elif f.find('SETTING'):
+    elif f.find('SETTING') > 0:
         scan = 'SETTING'
+    elif f.find('POLE') > 0:
+        scan = 'POLE'
     else:
-        LOGGER.error(f"Cannot find RISING/SETTING from file: {f}")
+        LOGGER.error(f"Cannot find RISING/SETTING/POLE from file: {f}")
         sys.exit(1)
     idx = numpy.where(obs_seq[scan]['filename'] == f)[0][0]
     if scan == 'RISING':
         dtime = (2*idx + 1)*60
     if scan == 'SETTING':
         dtime = (2*idx + 2)*60
+    if scan == 'POLE':
+        dtime = (2*idx - 1)*60
 
     obs_id = int(date0 + dtime)
     LOGGER.info(f"Will add obs_id: {obs_id} to: {file}")

@@ -5,14 +5,20 @@ Utility script to get CSV file with obsering sequence from DC1
 To run on the ICC:
 
 # SETTING scans
-%> cd /projects/caps/cmbs4/sims/healpix_maps
+%> cd /projects/caps/cmbs4/sims/healpix_maps_DC0
 %> get_obs_sequence "*SETTING*.fits.gz"
 %> mv obs_seq.csv obs_seq_SETTING.csv
 
 # RISING scans
-%> cd /projects/caps/cmbs4/sims/healpix_maps
-%> get_obs_sequence ""*RISING*.fits.gz"
+%> cd /projects/caps/cmbs4/sims/healpix_maps_DC0
+%> get_obs_sequence "*RISING*.fits.gz"
 %> mv obs_seq.csv obs_seq_RISING.csv
+
+# POLE scans
+%> cd /projects/caps/cmbs4/sims/healpix_maps_DC0/f150
+%> get_obs_sequence "*POLE*noiseweighted_map_nside4096_invcov.fits.gz"
+%> mv obs_seq.csv obs_seq_POLE.csv
+
 """
 
 import sys
@@ -36,11 +42,19 @@ writer.writerow(header)
 for file in files:
     # Decode as utf-8 and remove the newline
     file = file.decode('utf-8').strip()
-    scan_type = file.split('_')[1]
-    obs_seq = file.split('_')[3]
-    ele = obs_seq.split('-')[0]
-    n1 = obs_seq.split('-')[1]
-    n2 = obs_seq.split('-')[2]
+    if file.find('POLE') == -1:
+        scan_type = file.split('_')[1]
+        obs_seq = file.split('_')[3]
+        ele = obs_seq.split('-')[0]
+        n1 = obs_seq.split('-')[1]
+        n2 = obs_seq.split('-')[2]
+    else:
+        scan_type = 'POLE'
+        obs_seq = file.split('_')[1]
+        ele = obs_seq.split('-')[0]
+        n1 = obs_seq.split('-')[1]
+        n2 = obs_seq.split('-')[2]
+
     writer.writerow([k, file, scan_type, obs_seq, ele, n1, n2])
     print(k, file, scan_type, obs_seq, ele, n1, n2)
     k += 1

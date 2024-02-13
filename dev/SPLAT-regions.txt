@@ -1,0 +1,11 @@
+# Region file format: DS9 version 4.1
+global color=green dashlist=8 3 width=1 font="helvetica 10 normal roman" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1
+fk5
+# Region 0
+box(37.0000000,-51.0000000,36000.000",36000.000",359.97516) # color=red
+# Region 1
+box(37.0000000,-58.0000000,36000.000",36000.000",359.97516) # color=red
+# Region 2
+box(37.0000000,-62.0000000,36000.000",36000.000",359.97516) # color=red
+# Region 3
+box(37.0000000,-66.5000000,28800.000",28800.000",359.97516) # color=red

@@ -218,7 +218,7 @@ def load_obs_seq():
     These files are generated at the ICC using the script `get_obs_sequence`
     """
     LOGGER.info("Loading observation sequence")
-    scans = ['RISING', 'SETTING']
+    scans = ['RISING', 'SETTING', 'POLE']
     obs_seq = {}
     for scan in scans:
         csvfile = os.path.join(S4TRANS_DIR, f"etc/obs_seq_{scan}.csv")
