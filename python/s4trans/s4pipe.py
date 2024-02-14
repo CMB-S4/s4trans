@@ -550,7 +550,8 @@ class S4pipe:
             t1 = time.time()
             self.logger.info(f"Doing: {nfile}/{self.config.nfiles} files")
             s4tools.ingest_fraction_file(filename, self.config.tablename,
-                                         con=con, replace=replace_insert)
+                                         con=con, replace=replace_insert,
+                                         dryrun=self.config.dryrun)
             self.logger.info(f"Done with {filename} time: {s4tools.elapsed_time(t1)} ")
             nfile += 1
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")

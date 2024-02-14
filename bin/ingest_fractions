@@ -21,7 +21,9 @@ def cmdline():
     # Replace if existed before
     parser.add_argument("--replace_insert", action='store_true', default=False,
                         help='Replace inserted value')
-
+    # Dry run option
+    parser.add_argument("--dryrun", action='store_true', default=False,
+                        help='dry run')
     # Logging options (loglevel/log_format/log_format_date)
     default_log_format = '[%(asctime)s.%(msecs)03d][%(levelname)s][%(name)s][%(funcName)s] %(message)s'
     default_log_format_date = '%Y-%m-%d %H:%M:%S'

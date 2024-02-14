@@ -164,7 +164,8 @@ def check_dbtable(dbname, tablename):
     return
 
 
-def ingest_fraction_file(filename, tablename, con=None, dbname=None, replace=False):
+def ingest_fraction_file(filename, tablename, con=None, dbname=None, replace=False,
+                         dryrun=False):
     """Ingest fractions from files into sqlite3 database"""
 
     # Make new connection if not available
@@ -199,6 +200,8 @@ def ingest_fraction_file(filename, tablename, con=None, dbname=None, replace=Fal
             insert_query = _insert_row.format(**{'or_replace': or_replace,
                                                  'tablename': tablename, 'values': values_str})
             LOGGER.debug(f"Executing:{insert_query}")
+            if dryrun:
+                continue
             try:
                 cur.execute(insert_query)
                 con.commit()
