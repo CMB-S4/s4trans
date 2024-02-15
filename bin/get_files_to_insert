@@ -15,8 +15,8 @@ def cmdline():
     parser.add_argument("--obs_width", type=int, action='store', default=15,
                         help="Lightcurve observation width")
     parser.add_argument("--scan", action="store", default='RISING', type=str.upper,
-                        choices=["RISING", "SETTING"],
-                        help="Scan type [RISING/SETTING]")
+                        choices=["RISING", "SETTING", "POLE"],
+                        help="Scan type [RISING/SETTING/POLE]")
 
     # DB options
     dbname = os.path.join(s4tools.S4TRANS_DIR, "etc/s4sims_DC0.db")

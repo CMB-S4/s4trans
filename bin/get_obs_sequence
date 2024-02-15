@@ -16,7 +16,7 @@ To run on the ICC:
 
 # POLE scans
 %> cd /projects/caps/cmbs4/sims/healpix_maps_DC0/f150
-%> get_obs_sequence "*POLE*noiseweighted_map_nside4096_invcov.fits.gz"
+%> get_obs_sequence "*POLE*noiseweighted_map_nside4096.fits.gz"
 %> mv obs_seq.csv obs_seq_POLE.csv
 
 """

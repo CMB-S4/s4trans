@@ -6,7 +6,10 @@ import os
 
 # Test healpix map
 # This file was created with this call:
-# %> toast_healpix_coadd LAT0_CHLAT_split_schedule_5710/mapmaker_RISING_SCAN_40-313-4_noiseweighted_map.h5 --nside_submap 8192 --outmap mapmaker_RISING_SCAN_40-313-4_noiseweighted_map_nside8192.fits
+# %> toast_healpix_coadd \
+# mapmaker_RISING_SCAN_40-313-4_noiseweighted_map.h5 \
+# --nside_submap 8192 \
+# --outmap mapmaker_RISING_SCAN_40-313-4_noiseweighted_map_nside8192.fits
 
 
 def define_splat_projections():
@@ -57,7 +60,7 @@ filenames = sys.argv[1:]
 
 projections = define_splat_projections()
 proj_name = 'spwide'
-proj_name = 'sp3'
+proj_name = 'sp1'
 
 print(f"-- Will use projection: {proj_name}")
 

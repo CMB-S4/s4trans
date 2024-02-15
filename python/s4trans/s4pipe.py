@@ -273,7 +273,7 @@ class S4pipe:
         on_fraction = frame3g.npix_nonzero/frame3g.size
         return on_fraction
 
-    def filter_sim_file(self, file, proj_name, filetypes, band='150GHz'):
+    def filter_sim_file(self, file, proj_name, filetypes, scan='RISING', band='150GHz'):
         """Filter Simulations using transient filtering method"""
 
         # Get the obs_id for the file and obs_seq
@@ -295,7 +295,7 @@ class S4pipe:
 
         # Insert if catalog is present
         if self.sources_coords is not None:
-            scale = self.get_flux_scales(file, proj_name, scan='RISING', nsigma=3)
+            scale = self.get_flux_scales(file, proj_name, scan=scan, nsigma=3)
             flux_scaled = self.sources_coords['FLUX']*scale
             map3g = insert_sources(map3g, self.sources_coords, flux_scaled, norm=False)
             self.logger.info("Done inserting sources")
@@ -610,10 +610,10 @@ class S4pipe:
         # Select only files above fraction threshold
         try:
             rec = self.rec_onfractions
-            self.logger.info(f"On fractions computed for thresh: {self.config.onfracion_thresh} -- skipping")
+            self.logger.info(f"On fractions already loaded for thresh: {self.config.onfracion_thresh} -- skipping")
         except Exception:
+            self.logger.info(f"Getting on fraction from DB for thresh: {self.config.onfracion_thresh}")
             self.rec_onfractions = self.get_db_onfractions(proj_name)
-            self.logger.info(f"Computing on fraction for thresh: {self.config.onfracion_thresh}")
             rec = self.rec_onfractions
 
         # Now we match using the observing sequence order and select
