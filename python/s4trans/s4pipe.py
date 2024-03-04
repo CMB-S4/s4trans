@@ -273,7 +273,7 @@ class S4pipe:
         on_fraction = frame3g.npix_nonzero/frame3g.size
         return on_fraction
 
-    def filter_sim_file(self, file, proj_name, filetypes, scan='RISING', band='150GHz'):
+    def filter_sim_file(self, file, proj_name, filetypes, band, scan='RISING'):
         """Filter Simulations using transient filtering method"""
 
         # Get the obs_id for the file and obs_seq
@@ -324,7 +324,7 @@ class S4pipe:
         # Add to the frame
         g3frame["Wunpol"] = weightmap
 
-        self.logger.info("Loading pipe for filtering")
+        self.logger.info(f"Loading pipe for filtering for band: {band}")
         pipe = core.G3Pipeline()
         pipe.Add(core.G3InfiniteSource, n=0)
         pipe.Add(maps.InjectMaps, map_id=band, maps_in=[map3g, weightmap])
@@ -379,7 +379,7 @@ class S4pipe:
 
         return
 
-    def filter_sims(self, filetypes=['FITS', 'G3']):
+    def filter_sims(self, filetypes=['FITS', 'G3'], band='150GHz'):
         """Run function self.filter_sim_file for a set of files and filters"""
         t0 = time.time()
         # Check input files vs file list
@@ -412,7 +412,7 @@ class S4pipe:
                     self.logger.info(f"Computed fraction: {on_fraction}")
                 if on_fraction > self.config.onfracion_thresh and on_fraction is not None:
                     self.logger.info(f"Fraction of non-zero pixels is ABOVE threshold: {on_fraction}")
-                    self.filter_sim_file(file, proj_name, filetypes)
+                    self.filter_sim_file(file, proj_name, filetypes, band)
                 else:
                     self.logger.info(f"Fraction of non-zero pixels is BELOW threshold: {on_fraction}")
                     self.logger.info(f"Skipping proj:{proj_name} for file: {file}")
