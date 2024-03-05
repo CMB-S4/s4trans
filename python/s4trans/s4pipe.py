@@ -297,7 +297,7 @@ class S4pipe:
         if self.sources_coords is not None:
             scale = self.get_flux_scales(file, proj_name, scan=scan, nsigma=3)
             flux_scaled = self.sources_coords['FLUX']*scale
-            map3g = insert_sources(map3g, self.sources_coords, flux_scaled, norm=False)
+            map3g = insert_sources(map3g, self.sources_coords, flux_scaled, band, norm=False)
             self.logger.info("Done inserting sources")
 
         # Create frame for output
@@ -422,7 +422,7 @@ class S4pipe:
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
         return
 
-    def project_sims(self, filetypes=['FITS', 'G3']):
+    def project_sims(self, filetypes=['FITS', 'G3'], band='150GHz'):
 
         t0 = time.time()
         # Check input files vs file list
@@ -457,7 +457,7 @@ class S4pipe:
                 # Project if above threshold
                 if on_fraction > self.config.onfracion_thresh and on_fraction is not None:
                     self.logger.info(f"Fraction of non-zero pixels is ABOVE threshold: {on_fraction}")
-                    self.project_sim_file(file, proj_name, filetypes)
+                    self.project_sim_file(file, proj_name, filetypes, band)
                 else:
                     self.logger.info(f"Fraction of non-zero pixels is BELOW threshold: {on_fraction}")
                     self.logger.info(f"Skipping FITS for projection: {proj_name}")
@@ -466,7 +466,7 @@ class S4pipe:
             nfile += 1
         self.logger.info(f"Grand total time: {s4tools.elapsed_time(t0)} ")
 
-    def project_sim_file(self, file, proj_name, filetypes):
+    def project_sim_file(self, file, proj_name, filetypes, band):
         """ Project single sim file"""
 
         # Get the obs_id for the file and obs_seq
@@ -490,13 +490,14 @@ class S4pipe:
         if self.sources_coords is not None:
             scale = self.get_flux_scales(file, proj_name, scan='RISING', nsigma=3)
             flux_scaled = self.sources_coords['FLUX']*scale
-            map3g = insert_sources(map3g, self.sources_coords, flux_scaled, norm=False)
+            map3g = insert_sources(map3g, self.sources_coords, flux_scaled, band, norm=False)
             self.logger.info("Done inserting sources")
 
         # Create frame for output
         g3frame = core.G3Frame(core.G3FrameType.Map)
         g3frame['T'] = map3g
         g3frame['T'].sparse = False
+        g3frame['Id'] = band
 
         # Create a weights maps of ones -- fake weights
         if self.config.clone_weight:
@@ -789,7 +790,7 @@ def define_tiles_projection_old(ntiles=6, x_len=14000, y_len=20000,
     return proj
 
 
-def insert_sources(frame, coords, flux, norm=True, sigma=1.5, nsigma=3):
+def insert_sources(frame, coords, flux, band, norm=True, sigma=1.5, nsigma=3):
 
     """
     Inserts source at (ra,dec) using wcs information from frame
@@ -830,6 +831,15 @@ def insert_sources(frame, coords, flux, norm=True, sigma=1.5, nsigma=3):
         LOGGER.error("Error: xo,yo (ra, dec) and flux must be same length")
         sys.exit()
 
+    # Get frequency from band
+    if band == '150GHz':
+        frequency = 150
+    elif band == '90GHz':
+        frequency = 90
+    else:
+        raise Exception(f"No frequency found for band:{band}. Band can be 90GHz or 150GHz")
+
+    LOGGER.info(f"Will use frequency: {frequency} for {band}")
     # Get the dimensions of the kernel, same for all objects we want to insert
     # Taken from:
     # https://github.com/SouthPoleTelescope/spt3g_software/blob/2a4ab81ba8ef0dd5a939b84fbbce3c76e1c99c35/transients/python/filter_tools.py#L606
@@ -850,7 +860,7 @@ def insert_sources(frame, coords, flux, norm=True, sigma=1.5, nsigma=3):
         yo = round(float(yimage[k]))
 
         # Transform the flux from mJy to K_CMB
-        flux_cmb = s4tools.mJy2K_CMB(flux[k], freq=150, fwhm=1.0)
+        flux_cmb = s4tools.mJy2K_CMB(flux[k], freq=frequency, fwhm=1.0)
 
         # Generate the kernel with fluxes
         kernel = gaussian2d(flux_cmb, dim, dim, sigma, norm=norm)(y, x)

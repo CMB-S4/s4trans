@@ -13,6 +13,9 @@ def cmdline():
                         help="Filename(s) to preocess")
     parser.add_argument("--outdir", type=str, action='store', default=None,
                         required=True, help="Location for output files")
+    parser.add_argument("--band", type=str, action='store', default="150GHz",
+                        choices=["90GHz", "150GHz"],
+                        help="Observed band (90GHz/150GHz)")
 
     # DB options
     dbname = os.path.join(os.environ['HOME'], "db/s4sims_DC0.db")
@@ -81,4 +84,4 @@ if __name__ == "__main__":
     # Get the command-line arguments
     args = cmdline()
     p = s4pipe.S4pipe(**args.__dict__)
-    p.project_sims(filetypes=args.output_filetypes)
+    p.project_sims(filetypes=args.output_filetypes, band=args.band)
