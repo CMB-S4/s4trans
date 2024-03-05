@@ -898,12 +898,14 @@ def get_obs_id(file, obs_seq):
         LOGGER.error(f"Cannot find RISING/SETTING/POLE from file: {f}")
         sys.exit(1)
     idx = numpy.where(obs_seq[scan]['filename'] == f)[0][0]
+    # We assume each observation is separated by 1.5hr
+    scan_time = 1.0
     if scan == 'RISING':
-        dtime = (2*idx + 1)*60
+        dtime = scan_time*(idx + 1)*3600
     if scan == 'SETTING':
-        dtime = (2*idx + 2)*60
+        dtime = scan_time*(idx + 2)*3600
     if scan == 'POLE':
-        dtime = (2*idx - 1)*60
+        dtime = scan_time*(idx - 1)*3600
 
     obs_id = int(date0 + dtime)
     LOGGER.info(f"Will add obs_id: {obs_id} to: {file}")
