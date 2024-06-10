@@ -14,6 +14,10 @@ try:
     pmax = float(sys.argv[2])
 except Exception:
     pmax = 100
+try:
+    tscale = float(sys.argv[3])
+except Exception:
+    tscale = 1
 
 print(df)
 # Define the location of the output
@@ -155,7 +159,7 @@ for pixel in thumbnails:
     for band in obsids[pixel]:
 
         # Time array in hours
-        dt = (np.asarray(obsids[pixel][band])-obsids[pixel][band][0])/3600.
+        dt = (np.asarray(obsids[pixel][band])-obsids[pixel][band][0])*tscale/3600.
         plt.errorbar(dt,
                      fluxes[pixel][band], fluxerrs[pixel][band], marker='o', ls='', label=band)
     plt.grid()

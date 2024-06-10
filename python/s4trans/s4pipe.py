@@ -790,7 +790,7 @@ def define_tiles_projection_old(ntiles=6, x_len=14000, y_len=20000,
     return proj
 
 
-def insert_sources(frame, coords, flux, band, norm=True, sigma=1.5, nsigma=3):
+def insert_sources(frame, coords, flux, band, norm=True, fwhm=1.5, nsigma=3):
 
     """
     Inserts source at (ra,dec) using wcs information from frame
@@ -808,8 +808,8 @@ def insert_sources(frame, coords, flux, band, norm=True, sigma=1.5, nsigma=3):
         The list or float with total flux of the source (units mJy)
     norm: Bool
         Normalize fluxe
-    sigma: float
-        The size of sigma
+    fwhm: float
+        The size of fwhm in arcmin
     nsigma: float
         The number of sigma to extend for the kernel
     """
@@ -848,7 +848,8 @@ def insert_sources(frame, coords, flux, band, norm=True, sigma=1.5, nsigma=3):
     # fwhm = 1.0*u  # Assuming ~150GHz
     # sigma = fwhms["150GHz"] / 2.35482 / frame3g.res
     # ---------------------------------
-    # For now we'll just use sigma=1 and nsigma=3 as defaults in kwargs
+    # Transform between fhwm and sigma
+    sigma = fwhm/2.35482/(frame.res/core.G3Units.arcmin)
     dim = int(numpy.ceil(nsigma * sigma))
     y, x = numpy.indices((2 * dim + 1, 2 * dim + 1))
     nobjects = len(ximage)
@@ -860,7 +861,7 @@ def insert_sources(frame, coords, flux, band, norm=True, sigma=1.5, nsigma=3):
         yo = round(float(yimage[k]))
 
         # Transform the flux from mJy to K_CMB
-        flux_cmb = s4tools.mJy2K_CMB(flux[k], freq=frequency, fwhm=1.0)
+        flux_cmb = s4tools.mJy2K_CMB(flux[k], freq=frequency, fwhm=fwhm)
 
         # Generate the kernel with fluxes
         kernel = gaussian2d(flux_cmb, dim, dim, sigma, norm=norm)(y, x)
