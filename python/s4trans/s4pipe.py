@@ -290,6 +290,8 @@ class S4pipe:
 
         t1 = time.time()
         map3gTT = maps.healpix_to_flatsky(self.hp_array_wgt[file], **proj)
+        # Put in the right units
+        map3gTT = map3gTT * core.G3Units.K
         self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
         self.logger.info(f"New Frame:\n {map3gTT}")
 
@@ -298,6 +300,8 @@ class S4pipe:
             scale = self.get_flux_scales(file, proj_name, scan=scan, nsigma=3)
             flux_scaled = self.sources_coords['FLUX']*scale
             map3g = insert_sources(map3g, self.sources_coords, flux_scaled, band, norm=False)
+            # Put in the right units
+            map3g = map3g * core.G3Units.K
             self.logger.info("Done inserting sources")
 
         # Create frame for output
@@ -483,6 +487,8 @@ class S4pipe:
 
         t1 = time.time()
         map3gTT = maps.healpix_to_flatsky(self.hp_array_wgt[file], **proj)
+        # Put in the right units
+        map3gTT = map3gTT * core.G3Units.K
         self.logger.info(f"Transforming done in: {s4tools.elapsed_time(t1)} ")
         self.logger.info(f"New Frame:\n {map3gTT}")
 
@@ -491,6 +497,8 @@ class S4pipe:
             scale = self.get_flux_scales(file, proj_name, scan='RISING', nsigma=3)
             flux_scaled = self.sources_coords['FLUX']*scale
             map3g = insert_sources(map3g, self.sources_coords, flux_scaled, band, norm=False)
+            # Put in the right units
+            map3g = map3g * core.G3Units.K
             self.logger.info("Done inserting sources")
 
         # Create frame for output
